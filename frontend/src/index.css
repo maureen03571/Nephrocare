@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-nephro-dark: #0d3d2b;
+  --color-nephro-primary: #1a6b4a;
+  --color-nephro-light: #2d8f6a;
+  --color-nephro-accent: #a8d96c;
+  --color-nephro-accentLight: #c5e877;
+  --color-nephro-bg: #f0f7ee;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-nephro-bg, #f0f7ee);
+    color: var(--color-nephro-dark, #0d3d2b);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+}
+
