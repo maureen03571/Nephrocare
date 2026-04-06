@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import { API_BASE_URL } from '../../config';
 
 const PatientSetup = () => {
   const { user } = useAuth();
@@ -19,7 +20,7 @@ const PatientSetup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`http://localhost:3001/api/patient/${user.id}/profile`, formData);
+      await axios.put(`${API_BASE_URL}/api/patient/${user.id}/profile`, formData);
       navigate('/patient/home');
     } catch (error) {
       console.error('Failed to save profile', error);

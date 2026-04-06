@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { Users, LogOut, MessageCircle, Bot } from 'lucide-react';
 import AIChat from '../../components/AIChat';
+import { API_BASE_URL } from '../../config';
 
 const DoctorDashboard = () => {
   const { user, logout } = useAuth();
@@ -14,7 +15,7 @@ const DoctorDashboard = () => {
 
   useEffect(() => {
     // Fetch real patients
-    axios.get('http://localhost:3001/api/users/patients').then(res => {
+    axios.get(`${API_BASE_URL}/api/users/patients`).then(res => {
       setPatients(res.data.patients || []);
     });
   }, []);
@@ -24,7 +25,7 @@ const DoctorDashboard = () => {
     if (activeTab === 'messages' && selectedPatientId) {
       const fetchDMs = async () => {
         try {
-          const res = await axios.get(`http://localhost:3001/api/dm/${user.id}/${selectedPatientId}`);
+          const res = await axios.get(`${API_BASE_URL}/api/dm/${user.id}/${selectedPatientId}`);
           setDmMessages(res.data.messages || []);
         } catch (err) {}
       };
@@ -40,7 +41,7 @@ const DoctorDashboard = () => {
     const payload = { fromId: user.id, toId: selectedPatientId, content: dmInput, role: 'doctor' };
     setDmMessages(prev => [...prev, { id: 'dt'+Date.now(), ...payload, timestamp: new Date().toISOString() }]);
     setDmInput('');
-    await axios.post('http://localhost:3001/api/dm', payload);
+    await axios.post(`${API_BASE_URL}/api/dm`, payload);
   };
 
   return (

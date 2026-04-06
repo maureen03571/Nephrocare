@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { Send, Users } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { Send, Users } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 
 const Community = () => {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ const Community = () => {
   useEffect(() => {
     const fetchMsgs = async () => {
       try {
-        const res = await axios.get('http://localhost:3001/api/community/messages');
+        const res = await axios.get(`${API_BASE_URL}/api/community/messages`);
         setMessages(res.data.messages || []);
       } catch (err) { }
     };
@@ -36,7 +37,7 @@ const Community = () => {
     setInput('');
 
     try {
-      await axios.post('http://localhost:3001/api/community/messages', payload);
+      await axios.post(`${API_BASE_URL}/api/community/messages`, payload);
     } catch (err) { }
   };
 

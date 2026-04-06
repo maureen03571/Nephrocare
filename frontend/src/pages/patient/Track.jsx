@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import { useAuth } from '../../context/AuthContext';
 import { PlusCircle, Check } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
+import { useAuth } from '../../context/AuthContext';
 
 const Track = () => {
   const { user } = useAuth();
@@ -20,21 +21,21 @@ const Track = () => {
 
   const submitSymptom = async (e) => {
     e.preventDefault();
-    await axios.post(`http://localhost:3001/api/patient/${user.id}/symptoms`, symptom);
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/symptoms`, symptom);
     setSymptom({ type: 'Fatigue', severity: 'Low', notes: '' });
     showSuccess();
   };
 
   const submitMed = async (e) => {
     e.preventDefault();
-    await axios.post(`http://localhost:3001/api/patient/${user.id}/medications`, med);
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/medications`, med);
     setMed({ name: '', dose: '', time: '' });
     showSuccess();
   };
 
   const submitWeight = async (e) => {
     e.preventDefault();
-    await axios.post(`http://localhost:3001/api/patient/${user.id}/weight`, weight);
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/weight`, weight);
     setWeight({ value: '', unit: 'kg' });
     showSuccess();
   };

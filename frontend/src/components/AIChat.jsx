@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Bot, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config';
 
 const AIChat = ({ customTitle = "AI Health Coach", customSubtitle = "Conversational guide to kidney health" }) => {
   const { user } = useAuth();
@@ -14,7 +15,7 @@ const AIChat = ({ customTitle = "AI Health Coach", customSubtitle = "Conversatio
 
   useEffect(() => {
     if (user?.id) {
-      axios.get(`http://localhost:3001/api/ai/chat/${user.id}`).then(res => {
+      axios.get(`${API_BASE_URL}/api/ai/chat/${user.id}`).then(res => {
         if (res.data.history && res.data.history.length > 0) {
           setMessages([
             { id: 'init', role: 'ai', text: "Welcome back! I remember our previous conversations." },
@@ -39,7 +40,7 @@ const AIChat = ({ customTitle = "AI Health Coach", customSubtitle = "Conversatio
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:3001/api/ai/chat', { userId: user?.id, message: userMsg.text });
+      const res = await axios.post(`${API_BASE_URL}/api/ai/chat`, { userId: user?.id, message: userMsg.text });
       const aiMsg = { id: Date.now() + 1, role: 'ai', text: res.data.reply };
       setMessages(prev => [...prev, aiMsg]);
       setLoading(false);

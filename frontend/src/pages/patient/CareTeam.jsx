@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { Send, UserPlus, Info } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { Send, UserPlus, Info } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 
 const CareTeam = () => {
   const { user } = useAuth();
@@ -13,7 +14,7 @@ const CareTeam = () => {
 
   useEffect(() => {
     // Fetch available doctors
-    axios.get('http://localhost:3001/api/users/doctors').then(res => {
+    axios.get(`${API_BASE_URL}/api/users/doctors`).then(res => {
       setDoctors(res.data.doctors || []);
     });
   }, []);
@@ -21,7 +22,7 @@ const CareTeam = () => {
   useEffect(() => {
     if (selectedDoctor) {
       const fetchMsgs = async () => {
-        const res = await axios.get(`http://localhost:3001/api/dm/${user.id}/${selectedDoctor.id}`);
+        const res = await axios.get(`${API_BASE_URL}/api/dm/${user.id}/${selectedDoctor.id}`);
         setMessages(res.data.messages || []);
       };
       fetchMsgs();
@@ -45,7 +46,7 @@ const CareTeam = () => {
     setInput('');
 
     try {
-      await axios.post('http://localhost:3001/api/dm', payload);
+      await axios.post(`${API_BASE_URL}/api/dm`, payload);
     } catch (err) { }
   };
 

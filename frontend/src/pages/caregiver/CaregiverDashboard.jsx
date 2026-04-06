@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { LogOut, Heart, Bell, Calendar, User, Bot, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AIChat from '../../components/AIChat';
+import { API_BASE_URL } from '../../config';
 
 const CaregiverDashboard = () => {
   const { user, logout } = useAuth();
@@ -14,7 +15,7 @@ const CaregiverDashboard = () => {
   React.useEffect(() => {
     // For now, caregiver sees the first registered patient as their "assigned" one
     // In a real app, this would be a specific assignment join table
-    axios.get('http://localhost:3001/api/users/patients')
+    axios.get(`${API_BASE_URL}/api/users/patients`)
       .then(res => {
         if (res.data.patients && res.data.patients.length > 0) {
           setPatient(res.data.patients[0]);

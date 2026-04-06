@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Droplet, Activity, Calendar, Clock, Bell } from 'lucide-react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../config';
 
 const Home = () => {
   const { user } = useAuth();
@@ -30,9 +31,9 @@ const Home = () => {
     const fetchData = async () => {
       try {
         const [profRes, sympRes, apptRes] = await Promise.all([
-          axios.get(`http://localhost:3001/api/patient/${user.id}/profile`),
-          axios.get(`http://localhost:3001/api/patient/${user.id}/symptoms`),
-          axios.get(`http://localhost:3001/api/patient/${user.id}/appointments`)
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/symptoms`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
         ]);
         setProfile(profRes.data.profile);
         setSymptoms(sympRes.data.symptoms);

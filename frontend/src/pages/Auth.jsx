@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import { API_BASE_URL } from '../config';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,13 +18,12 @@ const Auth = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
     const payload = isLogin 
       ? { email, password }
       : { email, password, name, role };
 
     try {
-      const res = await axios.post(`http://localhost:3001${endpoint}`, payload);
+      const res = await axios.post(`${API_BASE_URL}/api/auth/${isLogin ? 'login' : 'register'}`, payload);
       if (res.data.success) {
         login(res.data.user);
         if (res.data.user.role === 'patient') {
