@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { PlusCircle, Check } from 'lucide-react';
+import { PlusCircle, Check, AlertTriangle, Pill } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,6 +13,10 @@ const Track = () => {
   const [symptom, setSymptom] = useState({ type: 'Fatigue', severity: 'Low', notes: '' });
   const [med, setMed] = useState({ name: '', dose: '', time: '' });
   const [weight, setWeight] = useState({ value: '', unit: 'kg' });
+  const [sideEffect, setSideEffect] = useState('None');
+  const [otcName, setOtcName] = useState('');
+  const [fluidLeft, setFluidLeft] = useState(0.6);
+  const [mood, setMood] = useState('🙂');
 
   const showSuccess = () => {
     setSuccess(true);
@@ -43,6 +47,22 @@ const Track = () => {
   return (
     <div className="p-5">
       <h2 className="text-2xl font-bold text-nephro-dark mb-4">Track Health</h2>
+      <div className="bg-nephro-bg border border-nephro-accentLight/40 rounded-2xl p-4 mb-5">
+        <p className="text-sm font-bold text-nephro-dark">Daily Quick Check-In</p>
+        <div className="flex items-center gap-2 mt-2">
+          {['😄', '🙂', '😐', '😟'].map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMood(m)}
+              className={`w-9 h-9 rounded-full text-lg ${mood === m ? 'bg-nephro-primary text-white' : 'bg-white border border-gray-200'}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Pattern hint: swelling reported 3x this week? Consider messaging your care team.</p>
+      </div>
       
       {/* Tabs */}
       <div className="flex bg-white rounded-lg p-1 shadow-sm mb-6 border border-gray-100">
@@ -100,6 +120,14 @@ const Track = () => {
 
         {activeTab === 'medications' && (
           <form onSubmit={submitMed} className="space-y-4">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-blue-700">Visual Pill Organizer</p>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-center text-[11px]">
+                <div className="bg-white rounded-lg p-2 border border-blue-100"><Pill size={14} className="mx-auto mb-1 text-blue-600" />Morning</div>
+                <div className="bg-white rounded-lg p-2 border border-blue-100"><Pill size={14} className="mx-auto mb-1 text-blue-600" />Noon</div>
+                <div className="bg-white rounded-lg p-2 border border-blue-100"><Pill size={14} className="mx-auto mb-1 text-blue-600" />Evening</div>
+              </div>
+            </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Medication Name</label>
               <input type="text" required value={med.name} onChange={(e) => setMed({...med, name: e.target.value})} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none text-sm" placeholder="e.g. Lisinopril" />
@@ -113,6 +141,39 @@ const Track = () => {
                 <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Time</label>
                 <input type="time" required value={med.time} onChange={(e) => setMed({...med, time: e.target.value})} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none text-sm" />
               </div>
+            </div>
+            <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-green-700">Why am I taking this?</p>
+              <p className="text-xs text-green-800 mt-1">Common kidney medications help control blood pressure, reduce protein leakage, and protect kidney function.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Side Effect Logger</label>
+              <select value={sideEffect} onChange={(e) => setSideEffect(e.target.value)} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none text-sm">
+                <option>None</option>
+                <option>Dizziness</option>
+                <option>Nausea</option>
+                <option>Swelling</option>
+                <option>Rash</option>
+              </select>
+              {sideEffect === 'Swelling' && (
+                <p className="text-xs text-red-600 font-semibold mt-2">Concerning side effect detected. Please notify your doctor today.</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">OTC Interaction Check</label>
+              <input
+                type="text"
+                value={otcName}
+                onChange={(e) => setOtcName(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none text-sm"
+                placeholder="e.g. Ibuprofen"
+              />
+              {otcName.toLowerCase().includes('ibuprofen') && (
+                <div className="mt-2 text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg p-2 flex items-start gap-2">
+                  <AlertTriangle size={14} className="mt-0.5" />
+                  NSAIDs like ibuprofen can stress kidneys. Confirm with your care team before use.
+                </div>
+              )}
             </div>
             <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg active:scale-95 mt-2">
               <PlusCircle size={18} className="mr-2" /> Add Medication
@@ -132,6 +193,19 @@ const Track = () => {
                 </select>
               </div>
               <p className="text-xs text-gray-400 mt-2">Tracking weight helps monitor fluid retention.</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-blue-700">Fluid Calculator</p>
+              <p className="text-xs text-blue-800 mt-1">Daily limit: 1.8L. Remaining after morning coffee: {fluidLeft.toFixed(1)}L</p>
+              <input
+                type="range"
+                min="0"
+                max="1.8"
+                step="0.1"
+                value={fluidLeft}
+                onChange={(e) => setFluidLeft(Number(e.target.value))}
+                className="w-full mt-2"
+              />
             </div>
             <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg active:scale-95 mt-4">
               <PlusCircle size={18} className="mr-2" /> Log Weight

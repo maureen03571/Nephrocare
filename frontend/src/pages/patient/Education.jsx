@@ -1,8 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AIChat from '../../components/AIChat';
 
 const Education = () => {
-  return <AIChat customTitle="AI Health Coach" customSubtitle="Conversational guide to kidney health" />;
+  const [ckdStage, setCkdStage] = useState('Stage 3a');
+
+  const lessons = [
+    { title: 'What is GFR?', duration: '60 sec', level: 'Beginner' },
+    { title: 'Why limit potassium?', duration: '55 sec', level: 'Stage-focused' },
+    { title: 'How to read your labs', duration: '75 sec', level: 'Practical' }
+  ];
+
+  const foodSwaps = [
+    { from: 'Banana (high K)', to: 'Apple (lower K)' },
+    { from: 'Tomato soup', to: 'Cauliflower soup' },
+    { from: 'Cola', to: 'Lemon water' }
+  ];
+
+  return (
+    <div className="p-5 space-y-4">
+      <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 shadow-sm">
+        <p className="text-sm font-bold text-nephro-dark">Stage-Specific Learning</p>
+        <div className="flex gap-2 mt-2">
+          {['Stage 2', 'Stage 3a', 'Stage 3b', 'Stage 4'].map((stage) => (
+            <button
+              key={stage}
+              type="button"
+              onClick={() => setCkdStage(stage)}
+              className={`text-xs px-3 py-1.5 rounded-full border ${ckdStage === stage ? 'bg-nephro-primary text-white border-nephro-primary' : 'bg-white text-gray-600 border-gray-200'}`}
+            >
+              {stage}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Showing content relevant to {ckdStage}.</p>
+      </div>
+
+      <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 shadow-sm">
+        <p className="text-sm font-bold text-nephro-dark mb-2">Micro-Lessons</p>
+        <div className="space-y-2">
+          {lessons.map((lesson) => (
+            <div key={lesson.title} className="rounded-xl border border-gray-100 p-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-nephro-dark">{lesson.title}</p>
+                <p className="text-xs text-gray-500">{lesson.level}</p>
+              </div>
+              <span className="text-xs font-semibold bg-nephro-bg px-2 py-1 rounded-full">{lesson.duration}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 shadow-sm">
+        <p className="text-sm font-bold text-nephro-dark mb-2">Food Swap Suggestions</p>
+        <div className="space-y-2">
+          {foodSwaps.map((swap) => (
+            <p key={swap.from} className="text-xs text-gray-700">
+              Instead of <span className="font-semibold">{swap.from}</span>, try <span className="font-semibold">{swap.to}</span>.
+            </p>
+          ))}
+        </div>
+      </div>
+
+      <AIChat customTitle="AI Health Coach" customSubtitle="Ask about symptoms, labs, diet, and CKD-safe choices" />
+    </div>
+  );
 };
 
 export default Education;

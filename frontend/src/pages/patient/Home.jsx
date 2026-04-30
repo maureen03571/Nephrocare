@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Droplet, Activity, Calendar, Clock, Bell } from 'lucide-react';
+import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
@@ -9,6 +9,7 @@ const Home = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [symptoms, setSymptoms] = useState([]);
+  const [weights, setWeights] = useState([]);
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
@@ -30,13 +31,15 @@ const Home = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [profRes, sympRes, apptRes] = await Promise.all([
+        const [profRes, sympRes, weightRes, apptRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/symptoms`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/weight`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
         ]);
         setProfile(profRes.data.profile);
         setSymptoms(sympRes.data.symptoms);
+        setWeights(weightRes.data.weights || []);
         setAppointments(apptRes.data.appointments);
       } catch (err) {
         console.error(err);
@@ -44,6 +47,32 @@ const Home = () => {
     };
     if (user?.id) fetchData();
   }, [user?.id]);
+
+  const quickStats = useMemo(() => {
+    const sorted = [...weights].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const today = sorted[0];
+    const previous = sorted[1];
+    const todayValue = today ? Number(today.value) : null;
+    const prevValue = previous ? Number(previous.value) : null;
+    const delta = todayValue !== null && prevValue !== null ? (todayValue - prevValue).toFixed(1) : null;
+    return {
+      weightToday: todayValue,
+      weightYesterday: prevValue,
+      weightDelta: delta
+    };
+  }, [weights]);
+
+  const healthChecks = [
+    { label: 'Stayed hydrated', done: true },
+    { label: 'Meds on time', done: true },
+    { label: 'BP stable', done: symptoms.filter(s => s.severity === 'High').length === 0 }
+  ];
+
+  const priorityActions = [
+    { title: 'Take 2 medications in next hour', note: 'Morning kidney regimen', icon: <Bell size={18} /> },
+    { title: 'Log morning weight', note: 'Fluid retention check', icon: <Activity size={18} /> },
+    { title: 'Dialysis in 3 hours', note: 'Pre-session checklist ready', icon: <Clock size={18} /> }
+  ];
 
   return (
     <div className="px-5 py-4 min-h-full">
@@ -68,6 +97,71 @@ const Home = () => {
         {(profile?.treatments?.toLowerCase().includes('dialysis') || true) && (
           <ReminderCard title="Dialysis Session" time="02:00 PM" icon={<Clock size={22} />} theme="orange" />
         )}
+      </div>
+
+      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Today's Priority Actions</h3>
+      <div className="space-y-3">
+        {priorityActions.map((action) => (
+          <div key={action.title} className="bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-nephro-bg text-nephro-primary flex items-center justify-center">
+                {action.icon}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-nephro-dark">{action.title}</p>
+                <p className="text-xs text-gray-500">{action.note}</p>
+              </div>
+            </div>
+            <button className="text-xs px-3 py-1.5 rounded-full bg-nephro-primary text-white font-semibold">Done</button>
+          </div>
+        ))}
+      </div>
+
+      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Health Score Card</h3>
+      <div className="bg-white/80 rounded-3xl border border-gray-100 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-extrabold text-nephro-dark">You are doing well this week</p>
+            <p className="text-xs text-gray-500">Keep your consistency for better kidney outcomes.</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
+            <ShieldCheck size={20} />
+          </div>
+        </div>
+        <div className="space-y-2">
+          {healthChecks.map((check) => (
+            <div key={check.label} className="flex items-center justify-between text-sm">
+              <span className="text-nephro-dark">{check.label}</span>
+              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${check.done ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                {check.done ? 'Good' : 'Watch'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Quick Stats</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Weight Today" value={quickStats.weightToday !== null ? `${quickStats.weightToday} kg` : '--'} sub="Latest log" />
+        <StatCard label="Yesterday" value={quickStats.weightYesterday !== null ? `${quickStats.weightYesterday} kg` : '--'} sub="Previous log" />
+        <StatCard label="Change" value={quickStats.weightDelta !== null ? `${quickStats.weightDelta} kg` : '--'} sub="Today vs yesterday" />
+        <StatCard label="Fluid Intake" value="1.2L" sub="0.6L left today" />
+      </div>
+
+      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Motivation</h3>
+      <div className="bg-gradient-to-r from-nephro-primary to-nephro-light text-white rounded-3xl p-5 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold">7-day medication streak</p>
+            <p className="text-xs text-white/80 mt-1">You are building excellent habits.</p>
+          </div>
+          <Sparkles size={20} />
+        </div>
+        <div className="mt-4 flex gap-2">
+          <Badge label="Hydration Hero" />
+          <Badge label="Stable Labs" />
+          <Badge label="Track Champion" />
+        </div>
       </div>
 
       {/* Recent Symptoms */}
@@ -129,6 +223,21 @@ const Home = () => {
     </div>
   );
 };
+
+const StatCard = ({ label, value, sub }) => (
+  <div className="bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm">
+    <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{label}</p>
+    <p className="text-lg font-extrabold text-nephro-dark mt-1">{value}</p>
+    <p className="text-xs text-gray-500 mt-1">{sub}</p>
+  </div>
+);
+
+const Badge = ({ label }) => (
+  <div className="text-[11px] font-semibold bg-white/15 border border-white/20 px-3 py-1.5 rounded-full flex items-center gap-1">
+    <Trophy size={12} />
+    {label}
+  </div>
+);
 
 const ReminderCard = ({ title, time, icon, theme }) => {
   const themes = {
