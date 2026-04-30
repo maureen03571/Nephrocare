@@ -12,6 +12,7 @@ const Home = () => {
   const [symptoms, setSymptoms] = useState([]);
   const [weights, setWeights] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [resolvingAlertId, setResolvingAlertId] = useState(null);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -81,6 +82,24 @@ const Home = () => {
   const streakDays = dashboard?.streaks?.medicationDays ?? 0;
   const alertItems = dashboard?.alerts || [];
   const quickStatsFromApi = dashboard?.quickStats || {};
+
+  const resolveAlert = async (alertId) => {
+    try {
+      setResolvingAlertId(alertId);
+      await axios.put(`${API_BASE_URL}/api/patient/${user.id}/alerts/${alertId}/resolve`);
+      setDashboard((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          alerts: (prev.alerts || []).filter((alert) => alert.id !== alertId)
+        };
+      });
+    } catch (error) {
+      console.error('Failed to resolve alert', error);
+    } finally {
+      setResolvingAlertId(null);
+    }
+  };
 
   return (
     <div className="px-5 py-4 min-h-full">
@@ -182,10 +201,18 @@ const Home = () => {
               <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center mt-0.5">
                 <AlertCircle size={16} />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-bold text-nephro-dark">{alert.message}</p>
                 <p className="text-xs text-gray-500 mt-1 capitalize">{alert.severity} priority</p>
               </div>
+              <button
+                type="button"
+                onClick={() => resolveAlert(alert.id)}
+                disabled={resolvingAlertId === alert.id}
+                className="text-xs px-3 py-1.5 rounded-full bg-nephro-primary text-white font-semibold disabled:opacity-50"
+              >
+                {resolvingAlertId === alert.id ? 'Resolving...' : 'Resolve'}
+              </button>
             </div>
           ))}
         </div>
