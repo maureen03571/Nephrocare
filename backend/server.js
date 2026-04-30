@@ -55,11 +55,16 @@ const getPatientDashboard = (patientId) => {
   const meds = dataStore.medications[patientId] || [];
   const weights = dataStore.weights[patientId] || [];
   const alerts = dataStore.alerts[patientId] || [];
+  const fluidLogs = dataStore.fluidIntake[patientId] || [];
 
   const healthScore = calculateHealthScore({ symptoms, meds, weights });
   const weightDelta = getLatestWeightDelta(weights);
   const activeAlerts = alerts.filter(a => a.status !== 'resolved').slice(-5).reverse();
   const streakDays = (dataStore.streaks[patientId] && dataStore.streaks[patientId].medicationDays) || 0;
+  const todayKey = getTodayKey();
+  const todayFluidMl = fluidLogs
+    .filter((f) => String(f.date || '').slice(0, 10) === todayKey)
+    .reduce((sum, f) => sum + (Number(f.amountMl) || 0), 0);
 
   dataStore.healthScores[patientId] = {
     value: healthScore,
@@ -74,7 +79,8 @@ const getPatientDashboard = (patientId) => {
     quickStats: {
       weightDelta,
       symptomsLogged: symptoms.length,
-      medicationsTracked: meds.length
+      medicationsTracked: meds.length,
+      fluidTodayMl: todayFluidMl
     },
     alerts: activeAlerts
   };
@@ -147,6 +153,10 @@ const priorityActionCatalog = {
   weight: {
     title: 'Log morning weight',
     metricLabel: 'Weight logged'
+  },
+  dialysis: {
+    title: 'Dialysis session prep',
+    metricLabel: 'Dialysis prep started'
   }
 };
 
@@ -406,6 +416,41 @@ app.post('/api/patient/:id/weight', (req, res) => {
   res.json({ success: true, weight: newWeight });
 });
 
+app.get('/api/patient/:id/blood-pressure', (req, res) => {
+  res.json({ success: true, bloodPressures: dataStore.bloodPressures[req.params.id] || [] });
+});
+
+app.post('/api/patient/:id/blood-pressure', (req, res) => {
+  const systolic = Number(req.body?.systolic);
+  const diastolic = Number(req.body?.diastolic);
+  if (!Number.isFinite(systolic) || !Number.isFinite(diastolic)) {
+    return res.status(400).json({ success: false, message: 'systolic and diastolic are required numbers' });
+  }
+
+  if (!dataStore.bloodPressures[req.params.id]) dataStore.bloodPressures[req.params.id] = [];
+  const bp = { id: uuidv4(), systolic, diastolic, pulse: Number(req.body?.pulse) || null, date: new Date().toISOString() };
+  dataStore.bloodPressures[req.params.id].push(bp);
+  saveData();
+  res.json({ success: true, bloodPressure: bp });
+});
+
+app.get('/api/patient/:id/fluid-intake', (req, res) => {
+  res.json({ success: true, fluidLogs: dataStore.fluidIntake[req.params.id] || [] });
+});
+
+app.post('/api/patient/:id/fluid-intake', (req, res) => {
+  const amountMl = Number(req.body?.amountMl);
+  if (!Number.isFinite(amountMl) || amountMl <= 0) {
+    return res.status(400).json({ success: false, message: 'amountMl must be a positive number' });
+  }
+
+  if (!dataStore.fluidIntake[req.params.id]) dataStore.fluidIntake[req.params.id] = [];
+  const fluid = { id: uuidv4(), amountMl, source: req.body?.source || 'manual', date: new Date().toISOString() };
+  dataStore.fluidIntake[req.params.id].push(fluid);
+  saveData();
+  res.json({ success: true, fluid });
+});
+
 // Appointments
 app.get('/api/patient/:id/appointments', (req, res) => {
   res.json({ success: true, appointments: dataStore.appointments[req.params.id] || [] });
@@ -413,6 +458,38 @@ app.get('/api/patient/:id/appointments', (req, res) => {
 
 // Community / Socials
 app.get('/api/community/messages', (req, res) => {
+  if (!Array.isArray(dataStore.communityMessages) || dataStore.communityMessages.length === 0) {
+    dataStore.communityMessages = [
+      {
+        id: uuidv4(),
+        senderName: 'NephroCare Guide',
+        senderId: 'system',
+        topic: 'Tips for staying hydrated',
+        content: 'What helps you stay within your daily fluid target without feeling too thirsty?',
+        type: 'thread',
+        timestamp: new Date().toISOString()
+      },
+      {
+        id: uuidv4(),
+        senderName: 'NephroCare Guide',
+        senderId: 'system',
+        topic: 'Best low-potassium snacks',
+        content: 'Share your favorite low-potassium snack ideas that are easy to prepare.',
+        type: 'thread',
+        timestamp: new Date().toISOString()
+      },
+      {
+        id: uuidv4(),
+        senderName: 'NephroCare Guide',
+        senderId: 'system',
+        topic: 'How do you remember medications?',
+        content: 'What reminder routine works best for your medication schedule?',
+        type: 'thread',
+        timestamp: new Date().toISOString()
+      }
+    ];
+    saveData();
+  }
   res.json({ success: true, messages: dataStore.communityMessages });
 });
 app.post('/api/community/messages', (req, res) => {
@@ -423,6 +500,18 @@ app.post('/api/community/messages', (req, res) => {
   dataStore.communityMessages.push(newMessage);
   saveData();
   res.json({ success: true, message: newMessage });
+});
+
+app.get('/api/community/daily-prompt', (req, res) => {
+  const prompts = [
+    "Question of the day: What's your biggest CKD challenge this week?",
+    'What one habit helped your kidneys most this week?',
+    'What food swap has worked best for you recently?',
+    'How do you keep your medication routine consistent on busy days?'
+  ];
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  const prompt = prompts[dayOfYear % prompts.length];
+  res.json({ success: true, prompt });
 });
 
 // Direct Messages (Doctor <-> Patient)

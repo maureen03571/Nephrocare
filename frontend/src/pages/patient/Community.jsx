@@ -1,4 +1,4 @@
-import { Send, Users } from 'lucide-react';
+import { Send, Users, HelpCircle } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ const Community = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [dailyPrompt, setDailyPrompt] = useState('');
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -17,7 +18,14 @@ const Community = () => {
         setMessages(res.data.messages || []);
       } catch (err) { }
     };
+    const fetchPrompt = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/community/daily-prompt`);
+        setDailyPrompt(res.data.prompt || '');
+      } catch (err) { }
+    };
     fetchMsgs();
+    fetchPrompt();
     const interval = setInterval(fetchMsgs, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -55,28 +63,32 @@ const Community = () => {
          </div>
       </div>
       
-      {/* Chat Space */}
+      {dailyPrompt && (
+        <div className="mx-4 my-2 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+          <p className="text-xs font-bold text-blue-700 flex items-center"><HelpCircle size={14} className="mr-1" /> Question of the day</p>
+          <p className="text-sm text-blue-900 mt-1">{dailyPrompt}</p>
+        </div>
+      )}
+
+      {/* Forum Space */}
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-gray-400 mt-10 p-5 bg-white/50 rounded-2xl">
-            <p className="text-sm font-medium">No messages yet. Be the first to say hello!</p>
+          <div className="text-center text-gray-400 mt-10 p-5 bg-white/50 rounded-2xl border border-gray-100">
+            <p className="text-sm font-medium">Join your first discussion: introduce yourself and share one CKD tip.</p>
           </div>
         )}
         {messages.map(m => {
           const isMine = m.senderId === user?.id || (!m.senderId && m.senderName === user?.name);
           return (
-            <div key={m.id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2`}>
-              {!isMine && <span className="text-[10px] text-gray-500 ml-2 mb-1 font-bold">{m.senderName}</span>}
-              <div className={`max-w-[85%] rounded-[20px] p-4 text-[13px] font-medium leading-relaxed shadow-sm ${
-                isMine
-                  ? 'bg-gradient-to-br from-nephro-primary to-nephro-light text-white rounded-br-sm'
-                  : 'bg-white text-nephro-dark border border-gray-100 rounded-bl-sm'
-              }`}>
-                {m.content}
-                <div className={`text-[9px] mt-1.5 text-right font-bold ${isMine ? 'text-white/60' : 'text-gray-400'}`}>
-                  {new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </div>
+            <div key={m.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-gray-500 font-bold">{m.senderName || 'Member'}</span>
+                <span className="text-[10px] text-gray-400 font-semibold">
+                  {new Date(m.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
+              {m.topic && <p className="text-sm font-bold text-nephro-dark mb-1">{m.topic}</p>}
+              <p className={`text-sm leading-relaxed ${isMine ? 'text-nephro-primary font-medium' : 'text-nephro-dark'}`}>{m.content}</p>
             </div>
           );
         })}

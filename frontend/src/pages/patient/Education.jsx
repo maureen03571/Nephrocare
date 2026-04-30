@@ -16,8 +16,30 @@ const Education = () => {
     { from: 'Cola', to: 'Lemon water' }
   ];
 
+  const recommendedToday = {
+    title: 'Recommended for you: Why limit potassium?',
+    reason: 'Based on your Stage 3 focus and recent tracking patterns.'
+  };
+
+  const dailyTip = 'Daily Tip: If you feel unusually tired, check hydration and log symptoms before noon for better trend tracking.';
+  const essentialsDone = 3;
+  const essentialsTotal = 10;
+  const essentialsPercent = Math.round((essentialsDone / essentialsTotal) * 100);
+
   return (
     <div className="p-5 space-y-4">
+      <AIChat customTitle="AI Health Coach" customSubtitle="Get urgent answers about symptoms, labs, and diet choices" />
+
+      <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4 shadow-sm">
+        <p className="text-xs font-bold text-yellow-700">Daily actionable tip</p>
+        <p className="text-sm text-yellow-900 mt-1">{dailyTip}</p>
+      </div>
+
+      <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 shadow-sm">
+        <p className="text-sm font-bold text-nephro-dark">{recommendedToday.title}</p>
+        <p className="text-xs text-gray-500 mt-1">{recommendedToday.reason}</p>
+      </div>
+
       <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 shadow-sm">
         <p className="text-sm font-bold text-nephro-dark">Stage-Specific Learning</p>
         <div className="flex gap-2 mt-2">
@@ -33,6 +55,10 @@ const Education = () => {
           ))}
         </div>
         <p className="text-xs text-gray-500 mt-2">Showing content relevant to {ckdStage}.</p>
+        <p className="text-xs text-gray-600 mt-1">You have completed {essentialsDone}/{essentialsTotal} Stage essentials ({essentialsPercent}%).</p>
+        <div className="w-full h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
+          <div className="h-full bg-nephro-primary rounded-full" style={{ width: `${essentialsPercent}%` }} />
+        </div>
       </div>
 
       <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 shadow-sm">
@@ -61,7 +87,6 @@ const Education = () => {
         </div>
       </div>
 
-      <AIChat customTitle="AI Health Coach" customSubtitle="Ask about symptoms, labs, diet, and CKD-safe choices" />
     </div>
   );
 };

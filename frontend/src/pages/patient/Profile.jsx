@@ -1,11 +1,39 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { User, Settings, LogOut, FileText, Bell, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { API_BASE_URL } from '../../config';
 
 const Profile = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [profile, setProfile] = useState(null);
+  const [onboarding, setOnboarding] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!user?.id) return;
+      try {
+        const [profileRes, onboardingRes, dashboardRes, appointmentsRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
+        ]);
+        setProfile(profileRes.data.profile || null);
+        setOnboarding(onboardingRes.data.onboarding || null);
+        setDashboard(dashboardRes.data.dashboard || null);
+        setAppointments(appointmentsRes.data.appointments || []);
+      } catch (error) {
+        console.error('Failed to load profile summary', error);
+      }
+    };
+
+    fetchProfileData();
+  }, [user?.id]);
 
   const handleLogout = () => {
     logout();
@@ -31,6 +59,27 @@ const Profile = () => {
             {user?.role}
           </span>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+        <h4 className="text-sm font-bold text-nephro-dark mb-2">My Health Summary</h4>
+        <p className="text-xs text-gray-600">CKD Stage: <span className="font-semibold">{onboarding?.ckdStage || profile?.stage || 'Not set'}</span></p>
+        <p className="text-xs text-gray-600 mt-1">Latest GFR: <span className="font-semibold">{onboarding?.baselineLabs?.gfr || '--'}</span></p>
+        <p className="text-xs text-gray-600 mt-1">Creatinine: <span className="font-semibold">{onboarding?.baselineLabs?.creatinine || '--'}</span></p>
+        <p className="text-xs text-gray-600 mt-1">Dialysis status: <span className="font-semibold">{String(profile?.treatments || '').toLowerCase().includes('dialysis') ? 'On dialysis' : 'Not on dialysis'}</span></p>
+      </div>
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+        <h4 className="text-sm font-bold text-nephro-dark mb-2">Care Team & Next Visit</h4>
+        <p className="text-xs text-gray-600">Primary doctor: <span className="font-semibold">Dr. Assigned via Care Team</span></p>
+        <p className="text-xs text-gray-600 mt-1">Next appointment: <span className="font-semibold">{appointments[0]?.date ? new Date(appointments[0].date).toLocaleString() : 'No appointment scheduled'}</span></p>
+      </div>
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
+        <h4 className="text-sm font-bold text-nephro-dark mb-2">Emergency & Achievements</h4>
+        <p className="text-xs text-gray-600">When to call doctor: severe swelling, breathing difficulty, chest pain, no urine output.</p>
+        <p className="text-xs text-gray-600 mt-2">Medication streak: <span className="font-semibold">{dashboard?.streaks?.medicationDays ?? 0} days</span></p>
+        <p className="text-xs text-gray-600 mt-1">Symptoms tracked: <span className="font-semibold">{dashboard?.quickStats?.symptomsLogged ?? 0}</span></p>
       </div>
 
       {/* Settings Menu */}

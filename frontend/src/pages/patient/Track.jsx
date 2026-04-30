@@ -6,24 +6,28 @@ import { useAuth } from '../../context/AuthContext';
 
 const Track = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('symptoms'); // symptoms, medications, weight
+  const [activeTab, setActiveTab] = useState('symptoms'); // symptoms, vitals, food, medications
   const [success, setSuccess] = useState(false);
 
   // Form states
   const [symptom, setSymptom] = useState({ type: 'Fatigue', severity: 'Low', notes: '' });
   const [med, setMed] = useState({ name: '', dose: '', time: '' });
   const [weight, setWeight] = useState({ value: '', unit: 'kg' });
+  const [bloodPressure, setBloodPressure] = useState({ systolic: '', diastolic: '', pulse: '' });
+  const [foodLog, setFoodLog] = useState({ meal: '', notes: '' });
   const [sideEffect, setSideEffect] = useState('None');
   const [otcName, setOtcName] = useState('');
-  const [fluidLeft, setFluidLeft] = useState(0.6);
   const [mood, setMood] = useState('🙂');
   const [dailyProgress, setDailyProgress] = useState(null);
+  const [medicationLogs, setMedicationLogs] = useState([]);
 
   useEffect(() => {
     const fetchDailyProgress = async () => {
       try {
         const res = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/daily-actions`);
         setDailyProgress(res.data);
+        const medRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/medications`);
+        setMedicationLogs(medRes.data.medications || []);
       } catch (error) {
         console.error('Failed to load daily progress', error);
       }
@@ -61,6 +65,18 @@ const Track = () => {
     e.preventDefault();
     await axios.post(`${API_BASE_URL}/api/patient/${user.id}/weight`, weight);
     setWeight({ value: '', unit: 'kg' });
+    showSuccess();
+  };
+
+  const submitBloodPressure = async (e) => {
+    e.preventDefault();
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/blood-pressure`, bloodPressure);
+    setBloodPressure({ systolic: '', diastolic: '', pulse: '' });
+    showSuccess();
+  };
+
+  const quickLogFluid = async (amountMl) => {
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/fluid-intake`, { amountMl, source: 'track' });
     showSuccess();
   };
 
@@ -111,7 +127,7 @@ const Track = () => {
       
       {/* Tabs */}
       <div className="flex bg-white rounded-lg p-1 shadow-sm mb-6 border border-gray-100">
-        {['symptoms', 'medications', 'weight'].map(t => (
+        {['symptoms', 'vitals', 'food', 'medications'].map(t => (
           <button
             key={t}
             onClick={() => setActiveTab(t)}
@@ -159,6 +175,63 @@ const Track = () => {
             </div>
             <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg active:scale-95">
               <PlusCircle size={18} className="mr-2" /> Log Symptom
+            </button>
+          </form>
+        )}
+
+        {activeTab === 'vitals' && (
+          <div className="space-y-4">
+            <form onSubmit={submitWeight} className="space-y-3 bg-gray-50 border border-gray-100 rounded-xl p-4">
+              <p className="text-xs font-bold text-nephro-dark uppercase tracking-wider">Weight Tracking</p>
+              <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <input type="number" step="0.1" required value={weight.value} onChange={(e) => setWeight({...weight, value: e.target.value})} className="w-full p-4 bg-transparent outline-none text-xl font-bold" placeholder="0.0" />
+                <select value={weight.unit} onChange={(e) => setWeight({...weight, unit: e.target.value})} className="bg-transparent px-4 font-semibold text-gray-500 outline-none border-l border-gray-200">
+                  <option>kg</option>
+                  <option>lbs</option>
+                </select>
+              </div>
+              <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center">
+                <PlusCircle size={18} className="mr-2" /> Log Weight
+              </button>
+            </form>
+
+            <form onSubmit={submitBloodPressure} className="space-y-3 bg-gray-50 border border-gray-100 rounded-xl p-4">
+              <p className="text-xs font-bold text-nephro-dark uppercase tracking-wider">Blood Pressure</p>
+              <div className="grid grid-cols-3 gap-2">
+                <input type="number" required value={bloodPressure.systolic} onChange={(e) => setBloodPressure({ ...bloodPressure, systolic: e.target.value })} placeholder="Systolic" className="w-full p-3 rounded-lg bg-white border border-gray-200 outline-none text-sm" />
+                <input type="number" required value={bloodPressure.diastolic} onChange={(e) => setBloodPressure({ ...bloodPressure, diastolic: e.target.value })} placeholder="Diastolic" className="w-full p-3 rounded-lg bg-white border border-gray-200 outline-none text-sm" />
+                <input type="number" value={bloodPressure.pulse} onChange={(e) => setBloodPressure({ ...bloodPressure, pulse: e.target.value })} placeholder="Pulse" className="w-full p-3 rounded-lg bg-white border border-gray-200 outline-none text-sm" />
+              </div>
+              <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center">
+                <PlusCircle size={18} className="mr-2" /> Log BP
+              </button>
+            </form>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-blue-700">Fluid Intake Quick Log</p>
+              <div className="flex gap-2 mt-2">
+                {[250, 500].map((ml) => (
+                  <button key={ml} type="button" onClick={() => quickLogFluid(ml)} className="flex-1 py-2 rounded-lg bg-white border border-blue-100 text-blue-700 text-sm font-semibold">
+                    +{ml}ml
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'food' && (
+          <form onSubmit={(e) => { e.preventDefault(); setFoodLog({ meal: '', notes: '' }); showSuccess(); }} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Meal</label>
+              <input type="text" value={foodLog.meal} onChange={(e) => setFoodLog({ ...foodLog, meal: e.target.value })} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none text-sm" placeholder="e.g. Grilled fish + vegetables" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Notes</label>
+              <textarea value={foodLog.notes} onChange={(e) => setFoodLog({ ...foodLog, notes: e.target.value })} rows="3" className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none resize-none text-sm" placeholder="Potassium/sodium concerns, swaps, portion size..." />
+            </div>
+            <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg">
+              <PlusCircle size={18} className="mr-2" /> Log Meal
             </button>
           </form>
         )}
@@ -223,38 +296,13 @@ const Track = () => {
             <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg active:scale-95 mt-2">
               <PlusCircle size={18} className="mr-2" /> Add Medication
             </button>
-          </form>
-        )}
-
-        {activeTab === 'weight' && (
-          <form onSubmit={submitWeight} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Current Weight</label>
-              <div className="flex bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
-                <input type="number" step="0.1" required value={weight.value} onChange={(e) => setWeight({...weight, value: e.target.value})} className="w-full p-4 bg-transparent outline-none text-xl font-bold" placeholder="0.0" />
-                <select value={weight.unit} onChange={(e) => setWeight({...weight, unit: e.target.value})} className="bg-transparent px-4 font-semibold text-gray-500 outline-none border-l border-gray-200">
-                  <option>kg</option>
-                  <option>lbs</option>
-                </select>
-              </div>
-              <p className="text-xs text-gray-400 mt-2">Tracking weight helps monitor fluid retention.</p>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-gray-700 mb-2">Recent Medication Logs</p>
+              {(medicationLogs || []).slice(-3).reverse().map((m) => (
+                <p key={m.id} className="text-xs text-gray-600">{m.name} {m.dose} at {m.time || '--:--'}</p>
+              ))}
+              {(!medicationLogs || medicationLogs.length === 0) && <p className="text-xs text-gray-500">No medication logs yet.</p>}
             </div>
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-blue-700">Fluid Calculator</p>
-              <p className="text-xs text-blue-800 mt-1">Daily limit: 1.8L. Remaining after morning coffee: {fluidLeft.toFixed(1)}L</p>
-              <input
-                type="range"
-                min="0"
-                max="1.8"
-                step="0.1"
-                value={fluidLeft}
-                onChange={(e) => setFluidLeft(Number(e.target.value))}
-                className="w-full mt-2"
-              />
-            </div>
-            <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg active:scale-95 mt-4">
-              <PlusCircle size={18} className="mr-2" /> Log Weight
-            </button>
           </form>
         )}
       </div>
