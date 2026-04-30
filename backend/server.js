@@ -1,42 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
 require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
+const { loadDataStore, saveDataStore } = require('./lib/dataStore');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const dbPath = './dataStore.json';
-let dataStore = {
-  users: [], 
-  profiles: {}, 
-  symptoms: {}, 
-  medications: {}, 
-  weights: {}, 
-  communityMessages: [], 
-  appointments: {},
-  directMessages: [], // { id, fromId, toId, content, timestamp }
-  aiHistory: {} // { userId: [{ role: 'user'|'ai', text: '...' }] }
-};
-
-if (fs.existsSync(dbPath)) {
-  try {
-    dataStore = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-    // Ensure new fields exist
-    if (!dataStore.directMessages) dataStore.directMessages = [];
-    if (!dataStore.aiHistory) dataStore.aiHistory = {};
-  } catch (e) {
-    console.error("DB error", e);
-  }
-} else {
-  fs.writeFileSync(dbPath, JSON.stringify(dataStore, null, 2));
-}
+let dataStore = loadDataStore();
 
 const saveData = () => {
-  fs.writeFileSync(dbPath, JSON.stringify(dataStore, null, 2));
+  saveDataStore(dataStore);
 };
 
 // Users
