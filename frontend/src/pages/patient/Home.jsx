@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle, Play } from 'lucide-react';
+import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
@@ -21,7 +21,6 @@ const Home = () => {
   const [resolvingAlertId, setResolvingAlertId] = useState(null);
   const [dailyProgress, setDailyProgress] = useState(null);
   const [completingActionId, setCompletingActionId] = useState(null);
-  const [quickHydrationLoading, setQuickHydrationLoading] = useState(false);
   const [showMedicationDetail, setShowMedicationDetail] = useState(false);
 
   useEffect(() => {
@@ -101,9 +100,6 @@ const Home = () => {
   const quickStatsFromApi = dashboard?.quickStats || {};
   const completedActions = dailyProgress?.completed || {};
   const fluidTodayMl = Number(quickStatsFromApi.fluidTodayMl || 0);
-  const hydrationTargetMl = 1000;
-  const hydrationRemaining = Math.max(0, hydrationTargetMl - fluidTodayMl);
-  const hydrationPercent = Math.min(100, Math.round((fluidTodayMl / hydrationTargetMl) * 100));
   const totalDailyTasks = dailyProgress?.progress?.totalActions ?? priorityActions.length;
   const completedDailyTasks = dailyProgress?.progress?.completedCount ?? 0;
   const allDailyTasksDone = totalDailyTasks > 0 && completedDailyTasks >= totalDailyTasks;
@@ -140,20 +136,6 @@ const Home = () => {
     }
   };
 
-  const quickLogWater = async () => {
-    try {
-      setQuickHydrationLoading(true);
-      await axios.post(`${API_BASE_URL}/api/patient/${user.id}/fluid-intake`, { amountMl: 250, source: 'quick-glass' });
-      await completePriorityAction('hydration');
-      const dashboardRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`);
-      setDashboard(dashboardRes.data.dashboard || null);
-    } catch (error) {
-      console.error('Failed to quick-log water', error);
-    } finally {
-      setQuickHydrationLoading(false);
-    }
-  };
-
   return (
     <div className="px-5 py-4 min-h-full">
       {/* Header */}
@@ -167,41 +149,6 @@ const Home = () => {
         <div className="w-14 h-14 bg-gradient-to-tr from-nephro-accentLight to-white rounded-full flex items-center justify-center text-nephro-primary shadow-[0_4px_15px_rgba(168,217,108,0.4)] border border-white">
           <Activity size={28} />
         </div>
-      </div>
-
-      {/* Reminders / Tasks */}
-      <h3 className="font-bold text-lg mb-4 text-nephro-dark/90 px-1">Today's Focus</h3>
-      <div className="space-y-4">
-        <FocusCard
-          title="Drink Water (1L target)"
-          subtitle={`${fluidTodayMl}ml / ${hydrationTargetMl}ml (${hydrationRemaining}ml remaining)`}
-          icon={<Droplet size={22} />}
-          theme="blue"
-          progressPercent={hydrationPercent}
-          actionLabel={quickHydrationLoading ? 'Logging...' : '+250ml'}
-          actionDisabled={quickHydrationLoading}
-          onAction={quickLogWater}
-        />
-        <FocusCard
-          title="Lisinopril 10mg"
-          subtitle={completedActions.medication ? 'Taken and logged for today' : '08:00 AM'}
-          icon={<Bell size={22} />}
-          theme="green"
-          actionLabel={completedActions.medication ? 'Taken' : 'Take now'}
-          actionDisabled={Boolean(completedActions.medication) || completingActionId === 'medication'}
-          onAction={() => completePriorityAction('medication')}
-          onCardClick={() => setShowMedicationDetail(true)}
-        />
-        <FocusCard
-          title="Dialysis Session"
-          subtitle={completedActions.dialysis ? 'Preparation started' : '02:00 PM'}
-          icon={<Clock size={22} />}
-          theme="orange"
-          actionLabel={completedActions.dialysis ? 'Started' : 'Prepare'}
-          actionDisabled={Boolean(completedActions.dialysis) || completingActionId === 'dialysis'}
-          onAction={() => completePriorityAction('dialysis')}
-          actionIcon={<Play size={14} />}
-        />
       </div>
 
       <div className="mt-10 bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm">
@@ -218,7 +165,15 @@ const Home = () => {
               disabled={Boolean(completedActions[action.id]) || completingActionId === action.id}
               className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 flex items-center justify-between disabled:opacity-60"
             >
-              <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-2"
+                onClick={(e) => {
+                  if (action.id === 'medication') {
+                    e.stopPropagation();
+                    setShowMedicationDetail(true);
+                  }
+                }}
+              >
                 <div className="w-8 h-8 rounded-lg bg-nephro-bg text-nephro-primary flex items-center justify-center">
                   {action.icon}
                 </div>
@@ -411,39 +366,5 @@ const Badge = ({ label }) => (
     {label}
   </div>
 );
-
-const FocusCard = ({ title, subtitle, icon, theme, progressPercent, actionLabel, actionDisabled, onAction, actionIcon, onCardClick }) => {
-  const themes = {
-    blue: 'from-blue-50 to-blue-100/50 text-blue-700 border-blue-200 shadow-[0_8px_20px_rgba(59,130,246,0.1)]',
-    green: 'from-nephro-bg to-nephro-accentLight/30 text-nephro-primary border-nephro-accentLight/50 shadow-[0_8px_20px_rgba(26,107,74,0.1)]',
-    orange: 'from-orange-50 to-orange-100/50 text-orange-700 border-orange-200 shadow-[0_8px_20px_rgba(249,115,22,0.1)]'
-  };
-
-  return (
-    <div className={`bg-gradient-to-r ${themes[theme]} p-5 rounded-[24px] border transition-all duration-300 hover:scale-[1.02] flex items-center justify-between backdrop-blur-md relative`}>
-      <button type="button" onClick={onCardClick} className="flex items-center space-x-4 text-left">
-        <div className="p-3 bg-white/80 rounded-2xl shadow-sm backdrop-blur-sm">{icon}</div>
-        <div>
-          <p className="font-extrabold text-sm tracking-tight">{title}</p>
-          <p className="text-xs font-semibold opacity-70 mt-1">{subtitle}</p>
-        </div>
-      </button>
-      <button
-        type="button"
-        onClick={onAction}
-        disabled={actionDisabled}
-        className="px-3 py-1.5 rounded-full bg-white text-nephro-dark text-xs font-bold disabled:opacity-50 flex items-center gap-1"
-      >
-        {actionIcon}
-        {actionLabel}
-      </button>
-      {typeof progressPercent === 'number' && (
-        <div className="absolute left-4 right-4 bottom-2 h-1.5 rounded-full bg-white/60 overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progressPercent}%` }} />
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default Home;
