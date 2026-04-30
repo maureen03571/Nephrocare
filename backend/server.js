@@ -4,6 +4,12 @@ const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const { loadDataStore, saveDataStore } = require('./lib/dataStore');
+const {
+  validateAuthRegister,
+  validateSymptomPayload,
+  validateMedicationPayload,
+  validateWeightPayload
+} = require('./lib/validators');
 
 const app = express();
 app.use(cors());
@@ -153,7 +159,8 @@ app.post('/api/auth/login', (req, res) => {
 
 app.post('/api/auth/register', (req, res) => {
   const { email, password, name, role } = req.body;
-  if (!email || !password || !name) return res.status(400).json({ success: false, message: 'All fields required' });
+  const validationError = validateAuthRegister({ email, password, name, role });
+  if (validationError) return res.status(400).json({ success: false, message: validationError });
   if (dataStore.users.find(u => u.email === email)) {
     return res.status(400).json({ success: false, message: 'Email already exists' });
   }
@@ -217,6 +224,9 @@ app.get('/api/patient/:id/profile', (req, res) => {
   res.json({ success: true, profile: dataStore.profiles[req.params.id] || null });
 });
 app.put('/api/patient/:id/profile', (req, res) => {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ success: false, message: 'Profile payload is required' });
+  }
   dataStore.profiles[req.params.id] = { ...dataStore.profiles[req.params.id], ...req.body };
   saveData();
   res.json({ success: true, profile: dataStore.profiles[req.params.id] });
@@ -227,6 +237,9 @@ app.get('/api/patient/:id/symptoms', (req, res) => {
   res.json({ success: true, symptoms: dataStore.symptoms[req.params.id] || [] });
 });
 app.post('/api/patient/:id/symptoms', (req, res) => {
+  const validationError = validateSymptomPayload(req.body || {});
+  if (validationError) return res.status(400).json({ success: false, message: validationError });
+
   if (!dataStore.symptoms[req.params.id]) dataStore.symptoms[req.params.id] = [];
   const newSymptom = { id: uuidv4(), ...req.body, date: new Date().toISOString() };
   dataStore.symptoms[req.params.id].push(newSymptom);
@@ -267,6 +280,9 @@ app.get('/api/patient/:id/medications', (req, res) => {
   res.json({ success: true, medications: dataStore.medications[req.params.id] || [] });
 });
 app.post('/api/patient/:id/medications', (req, res) => {
+  const validationError = validateMedicationPayload(req.body || {});
+  if (validationError) return res.status(400).json({ success: false, message: validationError });
+
   if (!dataStore.medications[req.params.id]) dataStore.medications[req.params.id] = [];
   const newMed = { id: uuidv4(), ...req.body, date: new Date().toISOString() };
   dataStore.medications[req.params.id].push(newMed);
@@ -293,6 +309,9 @@ app.get('/api/patient/:id/weight', (req, res) => {
   res.json({ success: true, weights: dataStore.weights[req.params.id] || [] });
 });
 app.post('/api/patient/:id/weight', (req, res) => {
+  const validationError = validateWeightPayload(req.body || {});
+  if (validationError) return res.status(400).json({ success: false, message: validationError });
+
   if (!dataStore.weights[req.params.id]) dataStore.weights[req.params.id] = [];
   const newWeight = { id: uuidv4(), ...req.body, date: new Date().toISOString() };
   dataStore.weights[req.params.id].push(newWeight);
@@ -310,6 +329,9 @@ app.get('/api/community/messages', (req, res) => {
   res.json({ success: true, messages: dataStore.communityMessages });
 });
 app.post('/api/community/messages', (req, res) => {
+  if (!req.body || !String(req.body.content || '').trim()) {
+    return res.status(400).json({ success: false, message: 'Message content is required' });
+  }
   const newMessage = { id: uuidv4(), ...req.body, timestamp: new Date().toISOString() };
   dataStore.communityMessages.push(newMessage);
   saveData();
@@ -326,6 +348,10 @@ app.get('/api/dm/:userId1/:userId2', (req, res) => {
 });
 
 app.post('/api/dm', (req, res) => {
+  const { fromId, toId, content } = req.body || {};
+  if (!fromId || !toId || !String(content || '').trim()) {
+    return res.status(400).json({ success: false, message: 'fromId, toId and content are required' });
+  }
   const newMessage = { id: uuidv4(), ...req.body, timestamp: new Date().toISOString() };
   dataStore.directMessages.push(newMessage);
   saveData();
@@ -339,6 +365,9 @@ app.get('/api/ai/chat/:userId', (req, res) => {
 
 app.post('/api/ai/chat', async (req, res) => {
   const { userId, message } = req.body;
+  if (!userId || !String(message || '').trim()) {
+    return res.status(400).json({ success: false, message: 'userId and message are required' });
+  }
   if (!dataStore.aiHistory[userId]) dataStore.aiHistory[userId] = [];
   
   // Save user message
