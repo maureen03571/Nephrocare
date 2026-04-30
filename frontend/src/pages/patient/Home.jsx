@@ -22,6 +22,7 @@ const Home = () => {
   const [dailyProgress, setDailyProgress] = useState(null);
   const [completingActionId, setCompletingActionId] = useState(null);
   const [showMedicationDetail, setShowMedicationDetail] = useState(false);
+  const [localCompletedActions, setLocalCompletedActions] = useState({});
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -99,10 +100,13 @@ const Home = () => {
   const alertItems = dashboard?.alerts || [];
   const quickStatsFromApi = dashboard?.quickStats || {};
   const completedActions = dailyProgress?.completed || {};
+  const effectiveCompletedActions = { ...localCompletedActions, ...completedActions };
   const fluidTodayMl = Number(quickStatsFromApi.fluidTodayMl || 0);
   const totalDailyTasks = dailyProgress?.progress?.totalActions ?? priorityActions.length;
   const completedDailyTasks = dailyProgress?.progress?.completedCount ?? 0;
-  const allDailyTasksDone = totalDailyTasks > 0 && completedDailyTasks >= totalDailyTasks;
+  const fallbackCompletedDailyTasks = Object.values(effectiveCompletedActions).filter(Boolean).length;
+  const visibleCompletedDailyTasks = dailyProgress ? completedDailyTasks : fallbackCompletedDailyTasks;
+  const allDailyTasksDone = totalDailyTasks > 0 && visibleCompletedDailyTasks >= totalDailyTasks;
 
   const resolveAlert = async (alertId) => {
     try {
@@ -131,6 +135,7 @@ const Home = () => {
       setDailyProgress(res.data);
     } catch (error) {
       console.error('Failed to complete daily action', error);
+      setLocalCompletedActions((prev) => ({ ...prev, [actionId]: true }));
     } finally {
       setCompletingActionId(null);
     }
@@ -154,25 +159,13 @@ const Home = () => {
       <div className="mt-10 bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-base text-nephro-dark">Today's Checklist</h3>
-          <p className="text-xs text-gray-500">{completedDailyTasks}/{totalDailyTasks} done</p>
+          <p className="text-xs text-gray-500">{visibleCompletedDailyTasks}/{totalDailyTasks} done</p>
         </div>
         <div className="space-y-2 mt-3">
           {priorityActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => completePriorityAction(action.id)}
-              disabled={Boolean(completedActions[action.id]) || completingActionId === action.id}
-              className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 flex items-center justify-between disabled:opacity-60"
-            >
+            <div key={action.id} className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 flex items-center justify-between">
               <div
                 className="flex items-center gap-2"
-                onClick={(e) => {
-                  if (action.id === 'medication') {
-                    e.stopPropagation();
-                    setShowMedicationDetail(true);
-                  }
-                }}
               >
                 <div className="w-8 h-8 rounded-lg bg-nephro-bg text-nephro-primary flex items-center justify-center">
                   {action.icon}
@@ -180,12 +173,26 @@ const Home = () => {
                 <div className="text-left">
                   <p className="text-sm font-semibold text-nephro-dark">{action.title}</p>
                   <p className="text-[11px] text-gray-500">{action.note}</p>
+                  {action.id === 'medication' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMedicationDetail(true)}
+                      className="text-[11px] text-nephro-primary font-semibold hover:underline mt-0.5"
+                    >
+                      Details
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-xs font-bold ${completedActions[action.id] ? 'bg-nephro-primary border-nephro-primary text-white' : 'border-gray-300 text-transparent'}`}>
+              <button
+                type="button"
+                onClick={() => completePriorityAction(action.id)}
+                disabled={Boolean(effectiveCompletedActions[action.id]) || completingActionId === action.id}
+                className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-xs font-bold disabled:opacity-60 ${effectiveCompletedActions[action.id] ? 'bg-nephro-primary border-nephro-primary text-white' : 'border-gray-300 text-transparent'}`}
+              >
                 ✓
-              </div>
-            </button>
+              </button>
+            </div>
           ))}
         </div>
         <p className="text-[11px] text-gray-500 mt-3">Checklist resets at midnight.</p>
