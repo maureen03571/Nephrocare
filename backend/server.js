@@ -74,6 +74,59 @@ const getPatientDashboard = (patientId) => {
   };
 };
 
+const appendAlert = ({ patientId, type, severity, message, metadata = {} }) => {
+  if (!dataStore.alerts[patientId]) dataStore.alerts[patientId] = [];
+  dataStore.alerts[patientId].push({
+    id: uuidv4(),
+    type,
+    severity,
+    message,
+    metadata,
+    status: 'active',
+    createdAt: new Date().toISOString()
+  });
+};
+
+const isSameUtcDay = (a, b) => {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getUTCFullYear() === db.getUTCFullYear() &&
+    da.getUTCMonth() === db.getUTCMonth() &&
+    da.getUTCDate() === db.getUTCDate();
+};
+
+const updateMedicationStreak = (patientId, loggedAt) => {
+  if (!dataStore.streaks[patientId]) {
+    dataStore.streaks[patientId] = { medicationDays: 0, lastMedicationLogDate: null };
+  }
+
+  const streak = dataStore.streaks[patientId];
+  if (!streak.lastMedicationLogDate) {
+    streak.medicationDays = 1;
+    streak.lastMedicationLogDate = loggedAt;
+    return;
+  }
+
+  if (isSameUtcDay(streak.lastMedicationLogDate, loggedAt)) {
+    return;
+  }
+
+  const previousDate = new Date(streak.lastMedicationLogDate);
+  const currentDate = new Date(loggedAt);
+  const diffDays = Math.floor((Date.UTC(
+    currentDate.getUTCFullYear(),
+    currentDate.getUTCMonth(),
+    currentDate.getUTCDate()
+  ) - Date.UTC(
+    previousDate.getUTCFullYear(),
+    previousDate.getUTCMonth(),
+    previousDate.getUTCDate()
+  )) / 86400000);
+
+  streak.medicationDays = diffDays === 1 ? streak.medicationDays + 1 : 1;
+  streak.lastMedicationLogDate = loggedAt;
+};
+
 // Users
 app.get('/api/users/doctors', (req, res) => {
   const doctors = dataStore.users.filter(u => u.role === 'doctor');
@@ -140,6 +193,25 @@ app.get('/api/patient/:id/dashboard', (req, res) => {
   res.json({ success: true, dashboard });
 });
 
+app.get('/api/patient/:id/alerts', (req, res) => {
+  const alerts = (dataStore.alerts[req.params.id] || []).slice().reverse();
+  res.json({ success: true, alerts });
+});
+
+app.put('/api/patient/:id/alerts/:alertId/resolve', (req, res) => {
+  const { id, alertId } = req.params;
+  const alerts = dataStore.alerts[id] || [];
+  const alert = alerts.find(a => a.id === alertId);
+  if (!alert) {
+    return res.status(404).json({ success: false, message: 'Alert not found' });
+  }
+
+  alert.status = 'resolved';
+  alert.resolvedAt = new Date().toISOString();
+  saveData();
+  res.json({ success: true, alert });
+});
+
 // Profile endpoints
 app.get('/api/patient/:id/profile', (req, res) => {
   res.json({ success: true, profile: dataStore.profiles[req.params.id] || null });
@@ -158,6 +230,34 @@ app.post('/api/patient/:id/symptoms', (req, res) => {
   if (!dataStore.symptoms[req.params.id]) dataStore.symptoms[req.params.id] = [];
   const newSymptom = { id: uuidv4(), ...req.body, date: new Date().toISOString() };
   dataStore.symptoms[req.params.id].push(newSymptom);
+
+  if (newSymptom.severity === 'High') {
+    appendAlert({
+      patientId: req.params.id,
+      type: 'symptom',
+      severity: 'high',
+      message: `High-severity symptom logged: ${newSymptom.type || 'Unknown symptom'}`,
+      metadata: { symptomId: newSymptom.id }
+    });
+  }
+
+  const recentSwellingCount = (dataStore.symptoms[req.params.id] || []).filter((s) => {
+    if (!s.type || !String(s.type).toLowerCase().includes('swelling')) return false;
+    const symptomDate = new Date(s.date);
+    const threeDaysAgo = new Date(Date.now() - (3 * 24 * 60 * 60 * 1000));
+    return symptomDate >= threeDaysAgo;
+  }).length;
+
+  if (recentSwellingCount >= 3) {
+    appendAlert({
+      patientId: req.params.id,
+      type: 'pattern',
+      severity: 'medium',
+      message: 'Swelling has been reported 3+ times this week. Follow up with your doctor.',
+      metadata: { trigger: 'swelling_pattern' }
+    });
+  }
+
   saveData();
   res.json({ success: true, symptom: newSymptom });
 });
@@ -168,8 +268,22 @@ app.get('/api/patient/:id/medications', (req, res) => {
 });
 app.post('/api/patient/:id/medications', (req, res) => {
   if (!dataStore.medications[req.params.id]) dataStore.medications[req.params.id] = [];
-  const newMed = { id: uuidv4(), ...req.body };
+  const newMed = { id: uuidv4(), ...req.body, date: new Date().toISOString() };
   dataStore.medications[req.params.id].push(newMed);
+
+  updateMedicationStreak(req.params.id, newMed.date);
+
+  const sideEffect = String(req.body?.sideEffect || '').toLowerCase();
+  if (sideEffect && ['swelling', 'rash', 'dizziness', 'nausea'].includes(sideEffect)) {
+    appendAlert({
+      patientId: req.params.id,
+      type: 'medication-side-effect',
+      severity: sideEffect === 'swelling' || sideEffect === 'rash' ? 'high' : 'medium',
+      message: `Potential medication side effect reported: ${req.body.sideEffect}`,
+      metadata: { medicationId: newMed.id, sideEffect: req.body.sideEffect }
+    });
+  }
+
   saveData();
   res.json({ success: true, medication: newMed });
 });
