@@ -17,7 +17,8 @@ const defaultDataStore = () => ({
   onboarding: {},
   healthScores: {},
   streaks: {},
-  alerts: {}
+  alerts: {},
+  dailyActions: {}
 });
 
 const ensureSchema = (raw) => ({
@@ -35,7 +36,8 @@ const ensureSchema = (raw) => ({
   onboarding: raw?.onboarding && typeof raw.onboarding === 'object' ? raw.onboarding : {},
   healthScores: raw?.healthScores && typeof raw.healthScores === 'object' ? raw.healthScores : {},
   streaks: raw?.streaks && typeof raw.streaks === 'object' ? raw.streaks : {},
-  alerts: raw?.alerts && typeof raw.alerts === 'object' ? raw.alerts : {}
+  alerts: raw?.alerts && typeof raw.alerts === 'object' ? raw.alerts : {},
+  dailyActions: raw?.dailyActions && typeof raw.dailyActions === 'object' ? raw.dailyActions : {}
 });
 
 const loadDataStore = () => {

@@ -133,6 +133,35 @@ const updateMedicationStreak = (patientId, loggedAt) => {
   streak.lastMedicationLogDate = loggedAt;
 };
 
+const getTodayKey = () => new Date().toISOString().slice(0, 10);
+
+const priorityActionCatalog = {
+  hydration: {
+    title: 'Drink Water (1L target)',
+    metricLabel: 'Hydration target'
+  },
+  medication: {
+    title: 'Lisinopril 10mg',
+    metricLabel: 'Medication taken'
+  },
+  weight: {
+    title: 'Log morning weight',
+    metricLabel: 'Weight logged'
+  }
+};
+
+const getDailyActionBucket = (patientId, dayKey = getTodayKey()) => {
+  if (!dataStore.dailyActions[patientId]) dataStore.dailyActions[patientId] = {};
+  if (!dataStore.dailyActions[patientId][dayKey]) {
+    dataStore.dailyActions[patientId][dayKey] = {
+      completed: {},
+      history: [],
+      updatedAt: new Date().toISOString()
+    };
+  }
+  return dataStore.dailyActions[patientId][dayKey];
+};
+
 // Users
 app.get('/api/users/doctors', (req, res) => {
   const doctors = dataStore.users.filter(u => u.role === 'doctor');
@@ -198,6 +227,64 @@ app.get('/api/patient/:id/dashboard', (req, res) => {
   const dashboard = getPatientDashboard(req.params.id);
   saveData();
   res.json({ success: true, dashboard });
+});
+
+app.get('/api/patient/:id/daily-actions', (req, res) => {
+  const dayKey = req.query.date || getTodayKey();
+  const bucket = getDailyActionBucket(req.params.id, dayKey);
+  const totalActions = Object.keys(priorityActionCatalog).length;
+  const completedCount = Object.values(bucket.completed).filter(Boolean).length;
+  const progressPercent = Math.round((completedCount / totalActions) * 100);
+
+  res.json({
+    success: true,
+    date: dayKey,
+    progress: {
+      completedCount,
+      totalActions,
+      progressPercent
+    },
+    completed: bucket.completed,
+    history: [...bucket.history].reverse()
+  });
+});
+
+app.post('/api/patient/:id/daily-actions/complete', (req, res) => {
+  const actionType = String(req.body?.actionType || '').trim();
+  const dayKey = req.body?.date || getTodayKey();
+  const catalogItem = priorityActionCatalog[actionType];
+
+  if (!catalogItem) {
+    return res.status(400).json({ success: false, message: 'Invalid actionType' });
+  }
+
+  const bucket = getDailyActionBucket(req.params.id, dayKey);
+
+  if (!bucket.completed[actionType]) {
+    bucket.history.push({
+      id: uuidv4(),
+      actionType,
+      title: catalogItem.title,
+      metricLabel: catalogItem.metricLabel,
+      completedAt: new Date().toISOString()
+    });
+  }
+
+  bucket.completed[actionType] = true;
+  bucket.updatedAt = new Date().toISOString();
+  saveData();
+
+  const totalActions = Object.keys(priorityActionCatalog).length;
+  const completedCount = Object.values(bucket.completed).filter(Boolean).length;
+  const progressPercent = Math.round((completedCount / totalActions) * 100);
+
+  res.json({
+    success: true,
+    date: dayKey,
+    progress: { completedCount, totalActions, progressPercent },
+    completed: bucket.completed,
+    history: [...bucket.history].reverse()
+  });
 });
 
 app.get('/api/patient/:id/alerts', (req, res) => {

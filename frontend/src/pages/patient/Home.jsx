@@ -13,6 +13,8 @@ const Home = () => {
   const [weights, setWeights] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [resolvingAlertId, setResolvingAlertId] = useState(null);
+  const [dailyProgress, setDailyProgress] = useState(null);
+  const [completingActionId, setCompletingActionId] = useState(null);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -33,18 +35,20 @@ const Home = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [profRes, sympRes, weightRes, apptRes, dashboardRes] = await Promise.all([
+        const [profRes, sympRes, weightRes, apptRes, dashboardRes, dailyRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/symptoms`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/weight`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`),
-          axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`)
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/daily-actions`)
         ]);
         setProfile(profRes.data.profile);
         setSymptoms(sympRes.data.symptoms);
         setWeights(weightRes.data.weights || []);
         setAppointments(apptRes.data.appointments);
         setDashboard(dashboardRes.data.dashboard || null);
+        setDailyProgress(dailyRes.data || null);
       } catch (err) {
         console.error(err);
       }
@@ -73,15 +77,16 @@ const Home = () => {
   ];
 
   const priorityActions = [
-    { title: 'Take 2 medications in next hour', note: 'Morning kidney regimen', icon: <Bell size={18} /> },
-    { title: 'Log morning weight', note: 'Fluid retention check', icon: <Activity size={18} /> },
-    { title: 'Dialysis in 3 hours', note: 'Pre-session checklist ready', icon: <Clock size={18} /> }
+    { id: 'hydration', title: 'Drink Water (1L target)', note: 'Hydration target', icon: <Droplet size={18} /> },
+    { id: 'medication', title: 'Lisinopril 10mg', note: 'Morning kidney regimen', icon: <Bell size={18} /> },
+    { id: 'weight', title: 'Log morning weight', note: 'Fluid retention check', icon: <Activity size={18} /> }
   ];
 
   const healthScoreValue = dashboard?.healthScore?.value ?? null;
   const streakDays = dashboard?.streaks?.medicationDays ?? 0;
   const alertItems = dashboard?.alerts || [];
   const quickStatsFromApi = dashboard?.quickStats || {};
+  const completedActions = dailyProgress?.completed || {};
 
   const resolveAlert = async (alertId) => {
     try {
@@ -98,6 +103,20 @@ const Home = () => {
       console.error('Failed to resolve alert', error);
     } finally {
       setResolvingAlertId(null);
+    }
+  };
+
+  const completePriorityAction = async (actionId) => {
+    try {
+      setCompletingActionId(actionId);
+      const res = await axios.post(`${API_BASE_URL}/api/patient/${user.id}/daily-actions/complete`, {
+        actionType: actionId
+      });
+      setDailyProgress(res.data);
+    } catch (error) {
+      console.error('Failed to complete daily action', error);
+    } finally {
+      setCompletingActionId(null);
     }
   };
 
@@ -139,7 +158,14 @@ const Home = () => {
                 <p className="text-xs text-gray-500">{action.note}</p>
               </div>
             </div>
-            <button className="text-xs px-3 py-1.5 rounded-full bg-nephro-primary text-white font-semibold">Done</button>
+            <button
+              type="button"
+              onClick={() => completePriorityAction(action.id)}
+              disabled={Boolean(completedActions[action.id]) || completingActionId === action.id}
+              className="text-xs px-3 py-1.5 rounded-full bg-nephro-primary text-white font-semibold disabled:opacity-50"
+            >
+              {completedActions[action.id] ? 'Completed' : (completingActionId === action.id ? 'Saving...' : 'Done')}
+            </button>
           </div>
         ))}
       </div>
