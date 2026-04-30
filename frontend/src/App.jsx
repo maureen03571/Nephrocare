@@ -14,6 +14,7 @@ import Track from './pages/patient/Track';
 import Community from './pages/patient/Community';
 import Profile from './pages/patient/Profile';
 import CareTeam from './pages/patient/CareTeam';
+import Labs from './pages/patient/Labs';
 
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
 import CaregiverDashboard from './pages/caregiver/CaregiverDashboard';
@@ -45,6 +46,7 @@ const AppRoutes = () => {
         <Route path="education" element={<Education />} />
         <Route path="track" element={<Track />} />
         <Route path="community" element={<Community />} />
+        <Route path="labs" element={<Labs />} />
         <Route path="profile" element={<Profile />} />
         <Route path="care-team" element={<CareTeam />} />
       </Route>

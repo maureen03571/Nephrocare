@@ -451,6 +451,37 @@ app.post('/api/patient/:id/fluid-intake', (req, res) => {
   res.json({ success: true, fluid });
 });
 
+app.get('/api/patient/:id/labs', (req, res) => {
+  const labs = dataStore.labResults[req.params.id] || [];
+  res.json({ success: true, labs: [...labs].sort((a, b) => new Date(b.date) - new Date(a.date)) });
+});
+
+app.post('/api/patient/:id/labs', (req, res) => {
+  const gfr = Number(req.body?.gfr);
+  const creatinine = Number(req.body?.creatinine);
+  const potassium = Number(req.body?.potassium);
+  const phosphorus = Number(req.body?.phosphorus);
+  const reportName = String(req.body?.reportName || '').trim() || null;
+
+  if (![gfr, creatinine].every(Number.isFinite)) {
+    return res.status(400).json({ success: false, message: 'gfr and creatinine are required numbers' });
+  }
+
+  if (!dataStore.labResults[req.params.id]) dataStore.labResults[req.params.id] = [];
+  const lab = {
+    id: uuidv4(),
+    gfr,
+    creatinine,
+    potassium: Number.isFinite(potassium) ? potassium : null,
+    phosphorus: Number.isFinite(phosphorus) ? phosphorus : null,
+    reportName,
+    date: new Date().toISOString()
+  };
+  dataStore.labResults[req.params.id].push(lab);
+  saveData();
+  res.json({ success: true, lab });
+});
+
 // Appointments
 app.get('/api/patient/:id/appointments', (req, res) => {
   res.json({ success: true, appointments: dataStore.appointments[req.params.id] || [] });

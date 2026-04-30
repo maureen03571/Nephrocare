@@ -16,6 +16,7 @@ const Home = () => {
   const [dailyProgress, setDailyProgress] = useState(null);
   const [completingActionId, setCompletingActionId] = useState(null);
   const [quickHydrationLoading, setQuickHydrationLoading] = useState(false);
+  const [showMedicationDetail, setShowMedicationDetail] = useState(false);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -175,6 +176,7 @@ const Home = () => {
           actionLabel={completedActions.medication ? 'Taken' : 'Take now'}
           actionDisabled={Boolean(completedActions.medication) || completingActionId === 'medication'}
           onAction={() => completePriorityAction('medication')}
+          onCardClick={() => setShowMedicationDetail(true)}
         />
         <FocusCard
           title="Dialysis Session"
@@ -245,6 +247,10 @@ const Home = () => {
         <StatCard label="Change" value={quickStatsFromApi.weightDelta !== null && quickStatsFromApi.weightDelta !== undefined ? `${quickStatsFromApi.weightDelta} kg` : (quickStats.weightDelta !== null ? `${quickStats.weightDelta} kg` : '--')} sub="Today vs yesterday" />
         <StatCard label="Meds Tracked" value={quickStatsFromApi.medicationsTracked ?? 0} sub="Medication logs" />
       </div>
+      <Link to="/patient/labs" className="block mt-4 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+        <p className="text-sm font-bold text-nephro-dark">View Lab Results</p>
+        <p className="text-xs text-gray-500 mt-1">Check GFR trend, creatinine, potassium, and phosphorus.</p>
+      </Link>
 
       <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Motivation</h3>
       <div className="bg-gradient-to-r from-nephro-primary to-nephro-light text-white rounded-3xl p-5 shadow-lg">
@@ -347,6 +353,21 @@ const Home = () => {
            </div>
         </div>
       </Link>
+
+      {showMedicationDetail && (
+        <div className="fixed inset-0 bg-black/30 z-[60] flex items-end">
+          <div className="bg-white w-full rounded-t-3xl p-5 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-lg font-bold text-nephro-dark">Lisinopril Details</h4>
+              <button className="text-sm text-nephro-primary font-semibold" onClick={() => setShowMedicationDetail(false)}>Close</button>
+            </div>
+            <p className="text-sm text-gray-700">Dose: 10mg once daily</p>
+            <p className="text-sm text-gray-700">Why: Helps control blood pressure and protect kidney function.</p>
+            <p className="text-sm text-gray-700">Watch for: dizziness, swelling, persistent cough.</p>
+            <p className="text-sm text-gray-700">Refill date: in 9 days</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -366,7 +387,7 @@ const Badge = ({ label }) => (
   </div>
 );
 
-const FocusCard = ({ title, subtitle, icon, theme, progressPercent, actionLabel, actionDisabled, onAction, actionIcon }) => {
+const FocusCard = ({ title, subtitle, icon, theme, progressPercent, actionLabel, actionDisabled, onAction, actionIcon, onCardClick }) => {
   const themes = {
     blue: 'from-blue-50 to-blue-100/50 text-blue-700 border-blue-200 shadow-[0_8px_20px_rgba(59,130,246,0.1)]',
     green: 'from-nephro-bg to-nephro-accentLight/30 text-nephro-primary border-nephro-accentLight/50 shadow-[0_8px_20px_rgba(26,107,74,0.1)]',
@@ -375,13 +396,13 @@ const FocusCard = ({ title, subtitle, icon, theme, progressPercent, actionLabel,
 
   return (
     <div className={`bg-gradient-to-r ${themes[theme]} p-5 rounded-[24px] border transition-all duration-300 hover:scale-[1.02] flex items-center justify-between backdrop-blur-md relative`}>
-      <div className="flex items-center space-x-4">
+      <button type="button" onClick={onCardClick} className="flex items-center space-x-4 text-left">
         <div className="p-3 bg-white/80 rounded-2xl shadow-sm backdrop-blur-sm">{icon}</div>
         <div>
           <p className="font-extrabold text-sm tracking-tight">{title}</p>
           <p className="text-xs font-semibold opacity-70 mt-1">{subtitle}</p>
         </div>
-      </div>
+      </button>
       <button
         type="button"
         onClick={onAction}

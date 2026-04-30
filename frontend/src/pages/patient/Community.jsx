@@ -1,5 +1,5 @@
-import { Send, Users, HelpCircle } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { Users, HelpCircle, MessageSquarePlus } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config';
@@ -7,9 +7,9 @@ import { API_BASE_URL } from '../../config';
 const Community = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [topic, setTopic] = useState('');
+  const [content, setContent] = useState('');
   const [dailyPrompt, setDailyPrompt] = useState('');
-  const bottomRef = useRef(null);
 
   useEffect(() => {
     const fetchMsgs = async () => {
@@ -26,26 +26,25 @@ const Community = () => {
     };
     fetchMsgs();
     fetchPrompt();
-    const interval = setInterval(fetchMsgs, 3000);
-    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = async (e) => {
+  const handlePost = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
-
-    const payload = { senderName: user?.name, senderId: user?.id, content: input, timestamp: new Date().toISOString() };
-    
-    // Optimistic Update
-    setMessages(prev => [...prev, { id: 'temp-'+Date.now(), ...payload }]);
-    setInput('');
+    if (!content.trim()) return;
+    const payload = {
+      senderName: user?.name,
+      senderId: user?.id,
+      topic: topic.trim() || 'Community discussion',
+      content: content.trim(),
+      type: 'thread',
+      timestamp: new Date().toISOString()
+    };
 
     try {
       await axios.post(`${API_BASE_URL}/api/community/messages`, payload);
+      setMessages((prev) => [{ id: `temp-${Date.now()}`, ...payload }, ...prev]);
+      setTopic('');
+      setContent('');
     } catch (err) { }
   };
 
@@ -57,10 +56,6 @@ const Community = () => {
            <h2 className="font-extrabold text-2xl text-nephro-dark flex items-center"><Users className="mr-2 text-nephro-primary" /> Community</h2>
            <p className="text-xs font-semibold text-gray-500 mt-0.5">Share and support each other</p>
          </div>
-         <div className="flex space-x-1">
-            <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border border-white"></span>
-            <span className="text-[10px] text-green-700 font-bold uppercase tracking-widest mt[-1px]">Live</span>
-         </div>
       </div>
       
       {dailyPrompt && (
@@ -70,6 +65,26 @@ const Community = () => {
         </div>
       )}
 
+      <div className="mx-4 my-2 p-4 rounded-2xl bg-white border border-gray-100">
+        <p className="text-xs font-bold text-nephro-dark flex items-center"><MessageSquarePlus size={14} className="mr-1 text-nephro-primary" /> Start a discussion</p>
+        <form onSubmit={handlePost} className="mt-2 space-y-2">
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Discussion topic (e.g. Best low potassium breakfast)"
+            className="w-full p-3 rounded-lg border border-gray-200 text-sm outline-none"
+          />
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Share your experience or ask a question..."
+            rows="3"
+            className="w-full p-3 rounded-lg border border-gray-200 text-sm outline-none resize-none"
+          />
+          <button type="submit" className="w-full py-2.5 rounded-lg bg-nephro-primary text-white text-sm font-bold">Post Discussion</button>
+        </form>
+      </div>
+
       {/* Forum Space */}
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
         {messages.length === 0 && (
@@ -77,8 +92,8 @@ const Community = () => {
             <p className="text-sm font-medium">Join your first discussion: introduce yourself and share one CKD tip.</p>
           </div>
         )}
-        {messages.map(m => {
-          const isMine = m.senderId === user?.id || (!m.senderId && m.senderName === user?.name);
+        {[...messages].reverse().map(m => {
+          const isMine = m.senderId === user?.id;
           return (
             <div key={m.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-1">
@@ -92,21 +107,6 @@ const Community = () => {
             </div>
           );
         })}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      <div className="p-3">
-        <form onSubmit={handleSend} className="flex items-center bg-white/80 backdrop-blur-xl rounded-[24px] shadow-sm border border-gray-200 overflow-hidden px-2 py-1.5">
-          <input
-            type="text" value={input} onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 py-3 px-4 focus:outline-none text-sm bg-transparent placeholder-gray-400 font-medium"
-          />
-          <button type="submit" disabled={!input} className="w-11 h-11 bg-nephro-primary hover:bg-nephro-light hover:-translate-y-0.5 text-white rounded-full disabled:opacity-50 flex items-center justify-center transition-all duration-300">
-            <Send size={18} className="translate-x-[-1px] translate-y-[-1px]" />
-          </button>
-        </form>
       </div>
     </div>
   );
