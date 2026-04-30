@@ -17,11 +17,15 @@ const PatientSetup = () => {
     baselineCreatinine: '',
     medicationList: ''
   });
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
+    setSaving(true);
     try {
       await axios.put(`${API_BASE_URL}/api/patient/${user.id}/profile`, {
         name: formData.name,
@@ -50,17 +54,32 @@ const PatientSetup = () => {
       navigate('/patient/home');
     } catch (error) {
       console.error('Failed to save profile', error);
+      setErrorMessage(error?.response?.data?.message || 'Could not save profile right now. You can go back and try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <div className="h-full flex flex-col p-6 bg-nephro-bg overflow-y-auto">
       <div className="mb-8 mt-4">
+        <button
+          type="button"
+          onClick={() => navigate('/patient/home')}
+          className="mb-3 text-sm font-semibold text-nephro-primary hover:underline"
+        >
+          ← Back to Home
+        </button>
         <h2 className="text-2xl font-bold text-nephro-primary">Setup Your Profile</h2>
         <p className="text-sm text-gray-500 mt-1">Let's personalize your NephroCare experience.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">
+        {errorMessage && (
+          <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-lg px-4 py-3">
+            {errorMessage}
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-nephro-dark mb-1">Full Name</label>
           <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none" />
@@ -128,8 +147,12 @@ const PatientSetup = () => {
           />
         </div>
 
-        <button type="submit" className="w-full mt-8 bg-nephro-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-nephro-primary/30 active:scale-95 transition-transform">
-          Complete Profile
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full mt-8 bg-nephro-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-nephro-primary/30 active:scale-95 transition-transform disabled:opacity-60"
+        >
+          {saving ? 'Saving...' : 'Complete Profile'}
         </button>
       </form>
     </div>
