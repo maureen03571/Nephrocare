@@ -15,6 +15,65 @@ const saveData = () => {
   saveDataStore(dataStore);
 };
 
+const toNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const getLatestWeightDelta = (weights = []) => {
+  const sorted = [...weights].sort((a, b) => new Date(b.date) - new Date(a.date));
+  if (sorted.length < 2) return null;
+  const current = toNumber(sorted[0]?.value);
+  const previous = toNumber(sorted[1]?.value);
+  if (current === null || previous === null) return null;
+  return Number((current - previous).toFixed(1));
+};
+
+const calculateHealthScore = ({ symptoms, meds, weights }) => {
+  const highSeverityCount = symptoms.filter(s => s.severity === 'High').length;
+  const hasDailyMeds = meds.length > 0;
+  const hasRecentWeight = weights.length > 0;
+
+  let score = 55;
+  if (hasDailyMeds) score += 20;
+  if (hasRecentWeight) score += 15;
+  score -= Math.min(25, highSeverityCount * 8);
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const getPatientDashboard = (patientId) => {
+  const profile = dataStore.profiles[patientId] || {};
+  const onboarding = dataStore.onboarding[patientId] || null;
+  const symptoms = dataStore.symptoms[patientId] || [];
+  const meds = dataStore.medications[patientId] || [];
+  const weights = dataStore.weights[patientId] || [];
+  const alerts = dataStore.alerts[patientId] || [];
+
+  const healthScore = calculateHealthScore({ symptoms, meds, weights });
+  const weightDelta = getLatestWeightDelta(weights);
+  const activeAlerts = alerts.filter(a => a.status !== 'resolved').slice(-5).reverse();
+  const streakDays = (dataStore.streaks[patientId] && dataStore.streaks[patientId].medicationDays) || 0;
+
+  dataStore.healthScores[patientId] = {
+    value: healthScore,
+    generatedAt: new Date().toISOString()
+  };
+
+  return {
+    profile,
+    onboarding,
+    healthScore: dataStore.healthScores[patientId],
+    streaks: { medicationDays: streakDays },
+    quickStats: {
+      weightDelta,
+      symptomsLogged: symptoms.length,
+      medicationsTracked: meds.length
+    },
+    alerts: activeAlerts
+  };
+};
+
 // Users
 app.get('/api/users/doctors', (req, res) => {
   const doctors = dataStore.users.filter(u => u.role === 'doctor');
@@ -49,6 +108,36 @@ app.post('/api/auth/register', (req, res) => {
   dataStore.users.push(newUser);
   saveData();
   res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name } });
+});
+
+app.get('/api/patient/:id/onboarding', (req, res) => {
+  const onboarding = dataStore.onboarding[req.params.id] || null;
+  res.json({ success: true, onboarding });
+});
+
+app.put('/api/patient/:id/onboarding', (req, res) => {
+  const { ckdStage, baselineLabs, medicationList, quiz } = req.body || {};
+
+  if (!ckdStage) {
+    return res.status(400).json({ success: false, message: 'ckdStage is required' });
+  }
+
+  dataStore.onboarding[req.params.id] = {
+    ckdStage,
+    baselineLabs: baselineLabs || {},
+    medicationList: Array.isArray(medicationList) ? medicationList : [],
+    quiz: quiz || {},
+    updatedAt: new Date().toISOString()
+  };
+
+  saveData();
+  res.json({ success: true, onboarding: dataStore.onboarding[req.params.id] });
+});
+
+app.get('/api/patient/:id/dashboard', (req, res) => {
+  const dashboard = getPatientDashboard(req.params.id);
+  saveData();
+  res.json({ success: true, dashboard });
 });
 
 // Profile endpoints
