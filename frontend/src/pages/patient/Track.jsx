@@ -32,8 +32,12 @@ const Track = () => {
 
   const submitMed = async (e) => {
     e.preventDefault();
-    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/medications`, med);
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/medications`, {
+      ...med,
+      sideEffect: sideEffect !== 'None' ? sideEffect : ''
+    });
     setMed({ name: '', dose: '', time: '' });
+    setSideEffect('None');
     showSuccess();
   };
 

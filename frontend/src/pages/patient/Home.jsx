@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck } from 'lucide-react';
+import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
 const Home = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
   const [symptoms, setSymptoms] = useState([]);
   const [weights, setWeights] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -31,16 +32,18 @@ const Home = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [profRes, sympRes, weightRes, apptRes] = await Promise.all([
+        const [profRes, sympRes, weightRes, apptRes, dashboardRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/symptoms`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/weight`),
-          axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`)
         ]);
         setProfile(profRes.data.profile);
         setSymptoms(sympRes.data.symptoms);
         setWeights(weightRes.data.weights || []);
         setAppointments(apptRes.data.appointments);
+        setDashboard(dashboardRes.data.dashboard || null);
       } catch (err) {
         console.error(err);
       }
@@ -73,6 +76,11 @@ const Home = () => {
     { title: 'Log morning weight', note: 'Fluid retention check', icon: <Activity size={18} /> },
     { title: 'Dialysis in 3 hours', note: 'Pre-session checklist ready', icon: <Clock size={18} /> }
   ];
+
+  const healthScoreValue = dashboard?.healthScore?.value ?? null;
+  const streakDays = dashboard?.streaks?.medicationDays ?? 0;
+  const alertItems = dashboard?.alerts || [];
+  const quickStatsFromApi = dashboard?.quickStats || {};
 
   return (
     <div className="px-5 py-4 min-h-full">
@@ -122,7 +130,9 @@ const Home = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm font-extrabold text-nephro-dark">You are doing well this week</p>
-            <p className="text-xs text-gray-500">Keep your consistency for better kidney outcomes.</p>
+            <p className="text-xs text-gray-500">
+              {healthScoreValue !== null ? `Current score: ${healthScoreValue}/100` : 'Keep your consistency for better kidney outcomes.'}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
             <ShieldCheck size={20} />
@@ -144,15 +154,15 @@ const Home = () => {
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="Weight Today" value={quickStats.weightToday !== null ? `${quickStats.weightToday} kg` : '--'} sub="Latest log" />
         <StatCard label="Yesterday" value={quickStats.weightYesterday !== null ? `${quickStats.weightYesterday} kg` : '--'} sub="Previous log" />
-        <StatCard label="Change" value={quickStats.weightDelta !== null ? `${quickStats.weightDelta} kg` : '--'} sub="Today vs yesterday" />
-        <StatCard label="Fluid Intake" value="1.2L" sub="0.6L left today" />
+        <StatCard label="Change" value={quickStatsFromApi.weightDelta !== null && quickStatsFromApi.weightDelta !== undefined ? `${quickStatsFromApi.weightDelta} kg` : (quickStats.weightDelta !== null ? `${quickStats.weightDelta} kg` : '--')} sub="Today vs yesterday" />
+        <StatCard label="Meds Tracked" value={quickStatsFromApi.medicationsTracked ?? 0} sub="Medication logs" />
       </div>
 
       <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Motivation</h3>
       <div className="bg-gradient-to-r from-nephro-primary to-nephro-light text-white rounded-3xl p-5 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold">7-day medication streak</p>
+            <p className="text-sm font-bold">{streakDays}-day medication streak</p>
             <p className="text-xs text-white/80 mt-1">You are building excellent habits.</p>
           </div>
           <Sparkles size={20} />
@@ -163,6 +173,27 @@ const Home = () => {
           <Badge label="Track Champion" />
         </div>
       </div>
+
+      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Care Alerts</h3>
+      {alertItems.length > 0 ? (
+        <div className="space-y-3">
+          {alertItems.map((alert) => (
+            <div key={alert.id} className="bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center mt-0.5">
+                <AlertCircle size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-nephro-dark">{alert.message}</p>
+                <p className="text-xs text-gray-500 mt-1 capitalize">{alert.severity} priority</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white/60 backdrop-blur-md rounded-[24px] p-5 shadow-sm border border-white text-center">
+          <p className="text-sm font-medium text-gray-500">No active alerts. Keep up the consistency.</p>
+        </div>
+      )}
 
       {/* Recent Symptoms */}
       <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Recent Symptoms</h3>

@@ -12,7 +12,10 @@ const PatientSetup = () => {
     condition: '',
     stage: 'Stage 1',
     diagnosisDate: '',
-    treatments: ''
+    treatments: '',
+    baselineGfr: '',
+    baselineCreatinine: '',
+    medicationList: ''
   });
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,7 +23,30 @@ const PatientSetup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`${API_BASE_URL}/api/patient/${user.id}/profile`, formData);
+      await axios.put(`${API_BASE_URL}/api/patient/${user.id}/profile`, {
+        name: formData.name,
+        condition: formData.condition,
+        stage: formData.stage,
+        diagnosisDate: formData.diagnosisDate,
+        treatments: formData.treatments
+      });
+
+      await axios.put(`${API_BASE_URL}/api/patient/${user.id}/onboarding`, {
+        ckdStage: formData.stage,
+        baselineLabs: {
+          gfr: formData.baselineGfr || null,
+          creatinine: formData.baselineCreatinine || null
+        },
+        medicationList: formData.medicationList
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+        quiz: {
+          hydrationKnowledge: 'medium',
+          confidenceLevel: 'improving'
+        }
+      });
+
       navigate('/patient/home');
     } catch (error) {
       console.error('Failed to save profile', error);
@@ -61,6 +87,45 @@ const PatientSetup = () => {
         <div>
           <label className="block text-sm font-medium text-nephro-dark mb-1">Current Treatments</label>
           <textarea name="treatments" rows="3" value={formData.treatments} onChange={handleChange} placeholder="e.g. Hemodialysis, Lisinopril..." className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none resize-none"></textarea>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-nephro-dark mb-1">Baseline GFR</label>
+            <input
+              type="number"
+              step="0.1"
+              name="baselineGfr"
+              value={formData.baselineGfr}
+              onChange={handleChange}
+              placeholder="e.g. 48.2"
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-nephro-dark mb-1">Baseline Creatinine</label>
+            <input
+              type="number"
+              step="0.1"
+              name="baselineCreatinine"
+              value={formData.baselineCreatinine}
+              onChange={handleChange}
+              placeholder="e.g. 1.9"
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-nephro-dark mb-1">Medication List (comma separated)</label>
+          <input
+            type="text"
+            name="medicationList"
+            value={formData.medicationList}
+            onChange={handleChange}
+            placeholder="e.g. Lisinopril, Furosemide"
+            className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none"
+          />
         </div>
 
         <button type="submit" className="w-full mt-8 bg-nephro-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-nephro-primary/30 active:scale-95 transition-transform">
