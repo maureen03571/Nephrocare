@@ -5,6 +5,12 @@ import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
+const getDayOfYear = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  return Math.floor((now - start) / 86400000);
+};
+
 const Home = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -78,10 +84,15 @@ const Home = () => {
     { label: 'BP stable', done: symptoms.filter(s => s.severity === 'High').length === 0 }
   ];
 
-  const priorityActions = [
+  const basePriorityActions = [
     { id: 'hydration', title: 'Drink Water (1L target)', note: 'Hydration target', icon: <Droplet size={18} />, theme: 'blue' },
     { id: 'medication', title: 'Lisinopril 10mg', note: 'Morning kidney regimen', icon: <Bell size={18} /> },
     { id: 'dialysis', title: 'Dialysis Session', note: 'Prepare in 3 hours', icon: <Clock size={18} /> }
+  ];
+  const rotationOffset = getDayOfYear() % basePriorityActions.length;
+  const priorityActions = [
+    ...basePriorityActions.slice(rotationOffset),
+    ...basePriorityActions.slice(0, rotationOffset)
   ];
 
   const healthScoreValue = dashboard?.healthScore?.value ?? null;
@@ -93,6 +104,9 @@ const Home = () => {
   const hydrationTargetMl = 1000;
   const hydrationRemaining = Math.max(0, hydrationTargetMl - fluidTodayMl);
   const hydrationPercent = Math.min(100, Math.round((fluidTodayMl / hydrationTargetMl) * 100));
+  const totalDailyTasks = dailyProgress?.progress?.totalActions ?? priorityActions.length;
+  const completedDailyTasks = dailyProgress?.progress?.completedCount ?? 0;
+  const allDailyTasksDone = totalDailyTasks > 0 && completedDailyTasks >= totalDailyTasks;
 
   const resolveAlert = async (alertId) => {
     try {
@@ -190,55 +204,66 @@ const Home = () => {
         />
       </div>
 
-      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Today's Priority Actions</h3>
-      <div className="space-y-3">
-        {priorityActions.map((action) => (
-          <div key={action.title} className="bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-nephro-bg text-nephro-primary flex items-center justify-center">
-                {action.icon}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-nephro-dark">{action.title}</p>
-                <p className="text-xs text-gray-500">{action.note}</p>
-              </div>
-            </div>
+      <div className="mt-10 bg-white/80 rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-base text-nephro-dark">Today's Checklist</h3>
+          <p className="text-xs text-gray-500">{completedDailyTasks}/{totalDailyTasks} done</p>
+        </div>
+        <div className="space-y-2 mt-3">
+          {priorityActions.map((action) => (
             <button
+              key={action.id}
               type="button"
               onClick={() => completePriorityAction(action.id)}
               disabled={Boolean(completedActions[action.id]) || completingActionId === action.id}
-              className="text-xs px-3 py-1.5 rounded-full bg-nephro-primary text-white font-semibold disabled:opacity-50"
+              className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 flex items-center justify-between disabled:opacity-60"
             >
-              {completedActions[action.id] ? 'Completed' : (completingActionId === action.id ? 'Saving...' : 'Done')}
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-nephro-bg text-nephro-primary flex items-center justify-center">
+                  {action.icon}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-nephro-dark">{action.title}</p>
+                  <p className="text-[11px] text-gray-500">{action.note}</p>
+                </div>
+              </div>
+              <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-xs font-bold ${completedActions[action.id] ? 'bg-nephro-primary border-nephro-primary text-white' : 'border-gray-300 text-transparent'}`}>
+                ✓
+              </div>
             </button>
-          </div>
-        ))}
-      </div>
-
-      <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Health Score Card</h3>
-      <div className="bg-white/80 rounded-3xl border border-gray-100 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm font-extrabold text-nephro-dark">You are doing well this week</p>
-            <p className="text-xs text-gray-500">
-              {healthScoreValue !== null ? `Current score: ${healthScoreValue}/100` : 'Keep your consistency for better kidney outcomes.'}
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
-            <ShieldCheck size={20} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          {healthChecks.map((check) => (
-            <div key={check.label} className="flex items-center justify-between text-sm">
-              <span className="text-nephro-dark">{check.label}</span>
-              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${check.done ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                {check.done ? 'Good' : 'Watch'}
-              </span>
-            </div>
           ))}
         </div>
+        <p className="text-[11px] text-gray-500 mt-3">Checklist resets at midnight.</p>
       </div>
+
+      {allDailyTasksDone && (
+        <>
+          <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Health Score Card</h3>
+          <div className="bg-white/80 rounded-3xl border border-gray-100 p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm font-extrabold text-nephro-dark">You are doing well this week</p>
+                <p className="text-xs text-gray-500">
+                  {healthScoreValue !== null ? `Current score: ${healthScoreValue}/100` : 'Keep your consistency for better kidney outcomes.'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
+                <ShieldCheck size={20} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              {healthChecks.map((check) => (
+                <div key={check.label} className="flex items-center justify-between text-sm">
+                  <span className="text-nephro-dark">{check.label}</span>
+                  <span className={`text-xs px-2 py-1 rounded-full font-semibold ${check.done ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    {check.done ? 'Good' : 'Watch'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <h3 className="font-bold text-lg mb-4 mt-10 text-nephro-dark/90 px-1">Quick Stats</h3>
       <div className="grid grid-cols-2 gap-3">
