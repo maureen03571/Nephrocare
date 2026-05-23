@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle, Flame } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
@@ -147,9 +147,16 @@ const Home = () => {
       <div className="flex justify-between items-center mb-8 backdrop-blur-sm bg-white/30 p-4 rounded-3xl border border-white/50 shadow-sm">
         <div>
           <h1 className="text-3xl font-extrabold text-nephro-dark tracking-tight">Hi, {profile?.name || user?.name?.split(' ')[0]}</h1>
-          <p className="text-sm text-nephro-primary font-bold mt-1 bg-nephro-accentLight/20 inline-block px-3 py-1 rounded-full border border-nephro-accentLight/50">
-            {profile?.condition || 'Kidney Care'} • {profile?.stage || ''}
-          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <p className="text-sm text-nephro-primary font-bold bg-nephro-accentLight/20 inline-block px-3 py-1 rounded-full border border-nephro-accentLight/50">
+              {profile?.condition || 'Kidney Care'} • {profile?.stage || ''}
+            </p>
+            {streakDays > 0 && (
+              <span className="flex items-center gap-1 text-xs font-bold bg-orange-50 text-orange-500 border border-orange-100 px-2.5 py-1 rounded-full">
+                <Flame size={12} /> {streakDays}d streak
+              </span>
+            )}
+          </div>
         </div>
         <div className="w-14 h-14 bg-gradient-to-tr from-nephro-accentLight to-white rounded-full flex items-center justify-center text-nephro-primary shadow-[0_4px_15px_rgba(168,217,108,0.4)] border border-white">
           <Activity size={28} />

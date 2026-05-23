@@ -1,0 +1,289 @@
+{
+  "users": [
+    {
+      "id": "c38f711e-8b04-45ee-9fef-1ae23b1e505e",
+      "email": "fred@gmail",
+      "password": "567",
+      "name": "fred",
+      "role": "patient"
+    },
+    {
+      "id": "82e6a9fb-d06e-4515-aec6-4ac4e98b9062",
+      "email": "mimi@gmail",
+      "password": "456",
+      "name": "mimi",
+      "role": "patient"
+    },
+    {
+      "id": "acfa9a79-582e-46f0-ad98-a937004ac3ec",
+      "email": "shantel@gmail",
+      "password": "4567",
+      "name": "shantel",
+      "role": "patient"
+    },
+    {
+      "id": "2c44e43e-742a-4df5-80e6-c5605f7fba85",
+      "email": "john@gmail",
+      "password": "4567",
+      "name": "john",
+      "role": "patient"
+    },
+    {
+      "id": "b91fc25e-f761-458d-af85-af0b289808b8",
+      "email": "mburumaureen03@gmail.com",
+      "password": "wanjiku",
+      "name": "maureen",
+      "role": "patient"
+    },
+    {
+      "id": "b6374593-4dd3-458f-8867-7608fcb94df2",
+      "email": "mburumaureen03@om",
+      "password": "1234",
+      "name": "fred",
+      "role": "patient"
+    },
+    {
+      "id": "d67b3a4a-66ae-473c-b9ec-a77f740dac51",
+      "email": "wanjiku67@gmail.com",
+      "password": "4567",
+      "name": "maureen",
+      "role": "patient"
+    }
+  ],
+  "profiles": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": {
+      "name": "fred",
+      "condition": "CKD",
+      "stage": "Stage 1",
+      "diagnosisDate": "2026-03-30",
+      "treatments": "der"
+    },
+    "82e6a9fb-d06e-4515-aec6-4ac4e98b9062": {
+      "name": "mimi",
+      "condition": "kidney stones",
+      "stage": "Stage 1",
+      "diagnosisDate": "2026-03-29",
+      "treatments": "dialysis\n"
+    },
+    "acfa9a79-582e-46f0-ad98-a937004ac3ec": {
+      "name": "shantel",
+      "condition": "kidney stones",
+      "stage": "Stage 1",
+      "diagnosisDate": "2026-03-29",
+      "treatments": "dialysis"
+    },
+    "2c44e43e-742a-4df5-80e6-c5605f7fba85": {
+      "name": "john",
+      "condition": "CKD",
+      "stage": "Stage 1",
+      "diagnosisDate": "2026-03-30",
+      "treatments": "dialysis"
+    },
+    "b91fc25e-f761-458d-af85-af0b289808b8": {
+      "name": "maureen",
+      "condition": "ckd",
+      "stage": "Stage 1",
+      "diagnosisDate": "2026-03-29",
+      "treatments": "dialysis"
+    },
+    "b6374593-4dd3-458f-8867-7608fcb94df2": {
+      "name": "fred",
+      "condition": "ckd",
+      "stage": "Stage 1",
+      "diagnosisDate": "2026-03-29",
+      "treatments": "dialysis"
+    }
+  },
+  "symptoms": {},
+  "medications": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": [
+      {
+        "id": "35b38b98-37dd-4380-9860-5d3df68ce87d",
+        "name": "piriton",
+        "dose": "70mg",
+        "time": "18:08",
+        "sideEffect": "",
+        "date": "2026-05-09T15:49:56.036Z"
+      }
+    ]
+  },
+  "weights": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": [
+      {
+        "id": "0c265eaa-5ffc-4449-b62b-2fda12555fca",
+        "value": "65.0",
+        "unit": "kg",
+        "date": "2026-05-09T15:48:27.917Z"
+      }
+    ]
+  },
+  "bloodPressures": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": [
+      {
+        "id": "bab1576f-e420-4b13-8580-4f6fe5944994",
+        "systolic": 120,
+        "diastolic": 80,
+        "pulse": 97,
+        "date": "2026-05-09T15:48:47.445Z"
+      }
+    ]
+  },
+  "fluidIntake": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": [
+      {
+        "id": "2f0052c5-5d8b-4811-9c48-c440189beb98",
+        "amountMl": 500,
+        "source": "track",
+        "date": "2026-05-09T15:48:52.018Z"
+      }
+    ]
+  },
+  "labResults": {},
+  "communityMessages": [
+    {
+      "id": "2299bbe9-e7fa-45b9-b51b-83a33e9ca734",
+      "senderName": "NephroCare Guide",
+      "senderId": "system",
+      "topic": "Tips for staying hydrated",
+      "content": "What helps you stay within your daily fluid target without feeling too thirsty?",
+      "type": "thread",
+      "timestamp": "2026-05-09T15:21:24.353Z"
+    },
+    {
+      "id": "762850cf-ae4b-41c6-8f3a-2c2a3a12532f",
+      "senderName": "NephroCare Guide",
+      "senderId": "system",
+      "topic": "Best low-potassium snacks",
+      "content": "Share your favorite low-potassium snack ideas that are easy to prepare.",
+      "type": "thread",
+      "timestamp": "2026-05-09T15:21:24.353Z"
+    },
+    {
+      "id": "279400eb-6d07-4a0f-a215-f4ecf3c68390",
+      "senderName": "NephroCare Guide",
+      "senderId": "system",
+      "topic": "How do you remember medications?",
+      "content": "What reminder routine works best for your medication schedule?",
+      "type": "thread",
+      "timestamp": "2026-05-09T15:21:24.353Z"
+    },
+    {
+      "id": "104a75d7-87cb-46b0-9ab2-7275c1a83b8c",
+      "senderName": "fred",
+      "senderId": "c38f711e-8b04-45ee-9fef-1ae23b1e505e",
+      "topic": "water",
+      "content": "hi",
+      "type": "thread",
+      "timestamp": "2026-05-09T15:50:23.753Z"
+    }
+  ],
+  "appointments": {},
+  "directMessages": [],
+  "aiHistory": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": [
+      {
+        "role": "user",
+        "text": "hey"
+      },
+      {
+        "role": "ai",
+        "text": "Hello there! I'm here to support you with any questions or concerns you have about your kidney health, diet, or general well-being. How can I help you today?"
+      },
+      {
+        "role": "user",
+        "text": "what is dialysis"
+      },
+      {
+        "role": "ai",
+        "text": "Sorry, I am having trouble connecting to my AI brain at the moment. Error: {\"error\":{\"code\":403,\"message\":\"Your API key was reported as leaked. Please use another API key.\",\"status\":\"PERMISSION_DENIED\"}}"
+      },
+      {
+        "role": "user",
+        "text": "hi"
+      },
+      {
+        "role": "ai",
+        "text": "Hi there! I'm ready to help you now with any questions or concerns you have about your kidney health, diet, or general well-being. Please feel free to tell me what's on your mind."
+      }
+    ],
+    "acfa9a79-582e-46f0-ad98-a937004ac3ec": [
+      {
+        "role": "user",
+        "text": "hey"
+      },
+      {
+        "role": "ai",
+        "text": "Sorry, I am having trouble connecting to my AI brain at the moment. Error: {\"error\":{\"code\":403,\"message\":\"Your API key was reported as leaked. Please use another API key.\",\"status\":\"PERMISSION_DENIED\"}}"
+      }
+    ],
+    "2c44e43e-742a-4df5-80e6-c5605f7fba85": [
+      {
+        "role": "user",
+        "text": "hello"
+      },
+      {
+        "role": "ai",
+        "text": "Hello there! It's good to hear from you. Please feel free to share any questions or concerns you might have about your kidney health, symptoms, or anything else on your mind. Remember, if you experience any new symptoms, please log them in your Track tab."
+      },
+      {
+        "role": "user",
+        "text": "what is dialysis"
+      },
+      {
+        "role": "ai",
+        "text": "Dialysis is a medical treatment that takes over the job of your kidneys when they can no longer filter waste products and excess fluid from your blood effectively. It's a vital process to maintain your body's balance and health when kidney function significantly declines. Remember to log any new or concerning symptoms in your Track tab."
+      }
+    ],
+    "b91fc25e-f761-458d-af85-af0b289808b8": [
+      {
+        "role": "user",
+        "text": "hi"
+      },
+      {
+        "role": "ai",
+        "text": "Hello! It's good to hear from you. Please feel free to share any questions or concerns you might have about your kidney health or how you're feeling. Remember to log any new symptoms or changes you experience in the Track tab."
+      },
+      {
+        "role": "user",
+        "text": "how are you"
+      },
+      {
+        "role": "ai",
+        "text": "Thank you for asking! As an AI, I don't experience feelings, but I'm always ready and here to support you with your kidney health journey. Please let me know if you have any questions or if there's anything you'd like to discuss about how you're feeling. Remember to log any new symptoms in the Track tab."
+      }
+    ]
+  },
+  "onboarding": {},
+  "healthScores": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": {
+      "value": 90,
+      "generatedAt": "2026-05-09T17:51:55.376Z"
+    }
+  },
+  "streaks": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": {
+      "medicationDays": 1,
+      "lastMedicationLogDate": "2026-05-09T15:49:56.036Z"
+    }
+  },
+  "alerts": {},
+  "dailyActions": {
+    "c38f711e-8b04-45ee-9fef-1ae23b1e505e": {
+      "2026-05-09": {
+        "completed": {
+          "medication": true
+        },
+        "history": [
+          {
+            "id": "12ad68bd-9b44-4ac0-a8bd-0f1c2873c6d5",
+            "actionType": "medication",
+            "title": "Lisinopril 10mg",
+            "metricLabel": "Medication taken",
+            "completedAt": "2026-05-09T15:48:03.620Z"
+          }
+        ],
+        "updatedAt": "2026-05-09T15:48:03.621Z"
+      }
+    }
+  }
+}

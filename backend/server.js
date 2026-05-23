@@ -527,6 +527,8 @@ app.post('/api/community/messages', (req, res) => {
   if (!req.body || !String(req.body.content || '').trim()) {
     return res.status(400).json({ success: false, message: 'Message content is required' });
   }
+  // Guard: ensure communityMessages is always an array
+  if (!Array.isArray(dataStore.communityMessages)) dataStore.communityMessages = [];
   const newMessage = { id: uuidv4(), ...req.body, timestamp: new Date().toISOString() };
   dataStore.communityMessages.push(newMessage);
   saveData();
@@ -543,6 +545,129 @@ app.get('/api/community/daily-prompt', (req, res) => {
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
   const prompt = prompts[dayOfYear % prompts.length];
   res.json({ success: true, prompt });
+});
+
+// Education Articles – weekly rotating set
+const ALL_ARTICLES = [
+  {
+    id: 'a1', title: 'Understanding Your GFR', readTime: '3 min',
+    summary: 'GFR (Glomerular Filtration Rate) measures how well your kidneys filter waste. Learn what your number means.',
+    content: 'GFR is the best estimate of kidney function. A GFR of 60 or above is considered normal. Stage 3 CKD is defined by a GFR of 30–59. Tracking your GFR over time helps your doctor spot trends early. Ask for a copy of each lab report so you can watch your own trend.'
+  },
+  {
+    id: 'a2', title: 'Potassium & Your Kidneys', readTime: '4 min',
+    summary: 'Too much potassium can be dangerous when kidneys are impaired. Discover which foods to watch.',
+    content: 'Healthy kidneys remove excess potassium from the blood. When kidneys are damaged, potassium can build up (hyperkalemia), causing dangerous heart rhythms. High-potassium foods include bananas, oranges, potatoes, tomatoes, and dairy. Low-potassium alternatives include apples, berries, white rice, cauliflower, and green beans. Work with your renal dietitian to set a personal daily potassium limit.'
+  },
+  {
+    id: 'a3', title: 'Fluid Management Tips', readTime: '3 min',
+    summary: 'Managing fluid intake is critical in CKD. Practical daily strategies to stay within your target.',
+    content: 'Excess fluid stresses the heart and can raise blood pressure. Use a measured bottle so you know exactly how much you have drunk. Suck on ice chips rather than drinking large glasses of water. Limit foods with high water content like soups, gelatin, and fruit cups when fluid-restricted. Log every cup using the Fluid Intake tracker in the Track tab.'
+  },
+  {
+    id: 'a4', title: 'Why Sodium Matters', readTime: '3 min',
+    summary: 'Salt causes fluid retention and raises blood pressure. Here is how to cut sodium without losing flavour.',
+    content: 'Aim for less than 2,000 mg of sodium per day. Read nutrition labels — canned soups and processed meats are hidden salt traps. Cook with herbs, lemon juice, and garlic instead of salt. Request low-sodium options at restaurants. Even a modest reduction in sodium can lower blood pressure by several points within weeks.'
+  },
+  {
+    id: 'a5', title: 'Protein and CKD', readTime: '5 min',
+    summary: 'Eating the right amount of protein protects your remaining kidney function. Find your ideal range.',
+    content: 'High protein diets produce more waste that kidneys must filter. A low-to-moderate protein diet (0.6–0.8 g/kg body weight) slows CKD progression in many people. Focus on high-quality proteins like eggs, fish, and poultry rather than processed meats. If you are on dialysis, your protein requirement is actually higher — discuss with your care team. Track your protein intake in a food diary.'
+  },
+  {
+    id: 'a6', title: 'Blood Pressure Control in CKD', readTime: '4 min',
+    summary: 'High blood pressure is both a cause and consequence of kidney disease. Keeping it controlled is essential.',
+    content: 'Target blood pressure for most CKD patients is below 130/80 mmHg. Take medications as prescribed — ACE inhibitors and ARBs protect kidneys. Monitor at home and log readings in the Track tab. Reduce salt, exercise regularly (with doctor guidance), and manage stress through walking, breathing exercises, or yoga.'
+  },
+  {
+    id: 'a7', title: 'Exercise & Kidney Health', readTime: '3 min',
+    summary: 'Light regular exercise protects heart and kidney function. Safe activities to start today.',
+    content: 'Physical activity lowers blood pressure, controls blood sugar, and reduces inflammation — all beneficial for kidneys. Aim for 150 minutes of moderate activity per week (e.g., brisk walking, cycling, swimming). Avoid heavy lifting or high-impact exercise without clearance from your nephrologist. Even 10-minute walks after meals improve glucose and blood pressure control significantly.'
+  },
+  {
+    id: 'a8', title: 'Phosphorus: The Hidden Mineral', readTime: '4 min',
+    summary: 'Damaged kidneys struggle to remove phosphorus, leading to bone and heart complications.',
+    content: 'High phosphorus weakens bones by pulling calcium out of them (renal osteodystrophy) and can harden blood vessels. Limit dairy, nuts, whole-grain breads, dark colas, and processed foods with phosphate additives. Phosphate additives in packaged foods are absorbed almost completely — always check ingredients for words ending in "-phosphate". Take phosphate binders exactly as prescribed, usually with meals.'
+  },
+  {
+    id: 'a9', title: 'Managing Anaemia in CKD', readTime: '3 min',
+    summary: 'CKD often causes anaemia because damaged kidneys produce less erythropoietin. Know the signs.',
+    content: 'Erythropoietin (EPO) made by healthy kidneys signals bone marrow to produce red blood cells. In CKD, EPO falls and anaemia develops — causing fatigue, shortness of breath, and brain fog. Treatment includes EPO injections, iron supplements, and in severe cases, blood transfusions. Report unusual tiredness or pallor to your doctor promptly so they can check haemoglobin levels.'
+  },
+  {
+    id: 'a10', title: 'Travel Tips for CKD Patients', readTime: '3 min',
+    summary: 'Travelling with CKD requires planning. How to stay safe and comfortable on the go.',
+    content: 'Always carry a complete medication list with generic names and doses. Pack extra medications — delays happen. Identify dialysis centres at your destination if applicable. Keep to your fluid and diet restrictions even when eating out abroad. Use the NephroCare AI Health Coach for quick advice when you cannot reach your doctor during travel.'
+  },
+  {
+    id: 'a11', title: 'Mental Health & CKD', readTime: '4 min',
+    summary: 'Depression and anxiety are common in CKD. Why this happens and what helps.',
+    content: 'Living with a chronic illness is stressful, and the physical symptoms of CKD — fatigue, sleep issues, and diet restrictions — amplify mental health challenges. Up to 20% of CKD patients experience clinical depression. Talk to your care team honestly about your mood. Community support groups (like this one), walking, creative hobbies, and professional counselling all help. You are not alone in this.'
+  },
+  {
+    id: 'a12', title: 'Sleep & Kidney Disease', readTime: '3 min',
+    summary: 'Poor sleep worsens blood pressure and kidney function. Practical strategies for better rest.',
+    content: 'CKD patients often suffer from restless legs syndrome, sleep apnoea, and insomnia — all of which raise blood pressure and accelerate kidney decline. Maintain a regular sleep schedule. Limit fluids in the 2 hours before bed. Elevate the head of your bed slightly if you experience overnight fluid shifts. Ask your doctor about a sleep study if you snore heavily or wake exhausted.'
+  },
+  {
+    id: 'a13', title: 'Reading Your Lab Report', readTime: '5 min',
+    summary: 'Lab values like creatinine, BUN, GFR, and electrolytes — what they actually mean for you.',
+    content: 'Key values to track: GFR (kidney filter rate), Creatinine (waste product — higher is worse), BUN (blood urea nitrogen), Potassium, Phosphorus, Haemoglobin (anaemia marker), and Albumin (nutrition marker). Ask your doctor for a copy of every panel. Enter GFR and creatinine into the Labs tab of NephroCare after each visit. Trends over time matter more than a single reading.'
+  },
+  {
+    id: 'a14', title: 'Diabetes and CKD', readTime: '4 min',
+    summary: 'Diabetes is the leading cause of CKD. Tight glucose control is the most powerful kidney protector.',
+    content: 'High blood sugar damages the tiny blood vessels in the kidneys over years. Target HbA1c below 7% (or as advised by your doctor). Monitor blood glucose daily. Low-carbohydrate diets can significantly improve glucose control — a renal dietitian can help you design one that also fits your CKD restrictions. SGLT-2 inhibitors like empagliflozin have been shown to slow CKD progression in diabetic patients.'
+  },
+  {
+    id: 'a15', title: 'Preparing for a Nephrology Appointment', readTime: '3 min',
+    summary: 'Make the most of every specialist visit with this simple preparation checklist.',
+    content: 'Before your visit: write down all symptoms since your last appointment, bring your current medication list, bring your home blood pressure log, and have your most recent lab results. During the visit: ask what your current GFR trend means, ask whether your medication doses need adjustment, and confirm the date of your next labs. After: log your new results in the Labs tab immediately.'
+  },
+  {
+    id: 'a16', title: 'Hydration vs. Over-hydration', readTime: '3 min',
+    summary: 'Both dehydration and fluid overload harm kidneys. Finding your personal balance.',
+    content: 'Dehydration reduces blood flow to kidneys, causing acute injury on top of chronic disease. But over-hydration raises blood pressure and strains the heart. Your personal fluid target depends on your residual urine output, stage of disease, and blood pressure. Log your fluid intake daily and bring the log to appointments. Signs of fluid overload: ankle swelling, weight gain of more than 1 kg overnight, and shortness of breath.'
+  },
+  {
+    id: 'a17', title: 'Herbal Supplements & Kidney Risk', readTime: '3 min',
+    summary: 'Many herbal remedies are toxic to damaged kidneys. Know what to avoid.',
+    content: 'Avoid aristolochic acid (found in some Chinese herbs), thunder god vine, licorice root, chromium picolinate, and high-dose vitamin C supplementation. Always tell your nephrologist about every supplement you take — including traditional or herbal remedies. The phrase "natural" does not mean safe for kidneys. When in doubt, ask your pharmacist or doctor before starting anything new.'
+  },
+  {
+    id: 'a18', title: 'Dialysis: What to Expect', readTime: '5 min',
+    summary: 'If dialysis is approaching, understanding it early reduces fear and helps you plan.',
+    content: 'Dialysis replaces some kidney functions by filtering waste and excess fluid from your blood. Haemodialysis (HD) is done 3x per week at a centre or at home. Peritoneal dialysis (PD) uses your abdominal lining as a filter and can be done at home overnight. Starting dialysis is not failure — it is life-saving. Many people on dialysis work, travel, and live full lives. Talk to your care team about access creation (fistula or catheter) well before you need it.'
+  },
+  {
+    id: 'a19', title: 'Kidney Transplant Basics', readTime: '4 min',
+    summary: 'Transplantation is the best long-term treatment for kidney failure. Here is what to know.',
+    content: 'A kidney transplant gives you a working kidney from a living or deceased donor. It offers a better quality of life and longer survival compared to long-term dialysis. Evaluation for transplant should ideally begin before you need dialysis (pre-emptive transplant). You will need lifelong immunosuppressant medications to prevent rejection. Ask your nephrologist when to begin the transplant referral process.'
+  },
+  {
+    id: 'a20', title: 'Mouth Health & CKD', readTime: '3 min',
+    summary: 'Oral health problems are common with CKD and can worsen kidney disease. Easy steps to protect your mouth.',
+    content: 'Urea in saliva breaks down into ammonia, causing a metallic or ammonia taste — a common CKD symptom. Poor oral health raises systemic inflammation, which accelerates kidney decline. Brush twice daily, floss daily, and see a dentist every 6 months. Tell your dentist you have CKD so they can choose kidney-safe pain relievers and antibiotics if needed. Avoid NSAIDs (ibuprofen, naproxen) for dental pain.'
+  }
+];
+
+const getISOWeek = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+};
+
+app.get('/api/education/articles', (req, res) => {
+  const week = getISOWeek(new Date());
+  const articlesPerWeek = 5;
+  const startIndex = (week * articlesPerWeek) % ALL_ARTICLES.length;
+  const articles = [];
+  for (let i = 0; i < articlesPerWeek; i++) {
+    articles.push(ALL_ARTICLES[(startIndex + i) % ALL_ARTICLES.length]);
+  }
+  res.json({ success: true, week, articles });
 });
 
 // Direct Messages (Doctor <-> Patient)

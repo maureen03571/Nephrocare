@@ -19,7 +19,7 @@ const Auth = () => {
     e.preventDefault();
     setError('');
     const payload = isLogin 
-      ? { email, password }
+      ? { email, password, role }
       : { email, password, name, role };
 
     try {
@@ -65,24 +65,22 @@ const Auth = () => {
 
         {/* Premium Glassmorphism Form Card */}
         <div className="backdrop-blur-xl bg-white/50 border border-white/60 p-6 rounded-[32px] shadow-[0_8px_32px_rgba(26,107,74,0.1)]">
-          {!isLogin && (
-            <div className="mb-6 flex p-1.5 bg-white/60 backdrop-blur-md rounded-[18px] shadow-inner border border-white/40">
-              {['patient', 'doctor', 'caregiver'].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  className={`flex-1 py-2.5 text-sm font-bold rounded-xl capitalize transition-all duration-300 ${
-                    role === r
-                      ? 'bg-gradient-to-r from-nephro-primary to-nephro-light text-white shadow-[0_4px_12px_rgba(26,107,74,0.3)] scale-[1.02]'
-                      : 'text-gray-500 hover:text-nephro-dark'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="mb-6 flex p-1.5 bg-white/60 backdrop-blur-md rounded-[18px] shadow-inner border border-white/40">
+            {['patient', 'doctor', 'caregiver'].map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                className={`flex-1 py-2.5 text-sm font-bold rounded-xl capitalize transition-all duration-300 ${
+                  role === r
+                    ? 'bg-gradient-to-r from-nephro-primary to-nephro-light text-white shadow-[0_4px_12px_rgba(26,107,74,0.3)] scale-[1.02]'
+                    : 'text-gray-500 hover:text-nephro-dark'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (

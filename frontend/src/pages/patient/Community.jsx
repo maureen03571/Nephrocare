@@ -1,4 +1,4 @@
-import { Users, HelpCircle, MessageSquarePlus } from 'lucide-react';
+import { Users, HelpCircle, MessageSquarePlus, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +10,8 @@ const Community = () => {
   const [topic, setTopic] = useState('');
   const [content, setContent] = useState('');
   const [dailyPrompt, setDailyPrompt] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState('');
 
   useEffect(() => {
     const fetchMsgs = async () => {
@@ -31,6 +33,8 @@ const Community = () => {
   const handlePost = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
+    setPosting(true);
+    setPostError('');
     const payload = {
       senderName: user?.name,
       senderId: user?.id,
@@ -41,11 +45,16 @@ const Community = () => {
     };
 
     try {
-      await axios.post(`${API_BASE_URL}/api/community/messages`, payload);
-      setMessages((prev) => [{ id: `temp-${Date.now()}`, ...payload }, ...prev]);
+      const res = await axios.post(`${API_BASE_URL}/api/community/messages`, payload);
+      const saved = res.data.message || { id: `temp-${Date.now()}`, ...payload };
+      setMessages((prev) => [saved, ...prev]);
       setTopic('');
       setContent('');
-    } catch (err) { }
+    } catch (err) {
+      setPostError('Could not post. Please check your connection and try again.');
+    } finally {
+      setPosting(false);
+    }
   };
 
   return (
@@ -81,7 +90,21 @@ const Community = () => {
             rows="3"
             className="w-full p-3 rounded-lg border border-gray-200 text-sm outline-none resize-none"
           />
-          <button type="submit" className="w-full py-2.5 rounded-lg bg-nephro-primary text-white text-sm font-bold">Post Discussion</button>
+          {postError && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <AlertCircle size={14} className="text-red-500 shrink-0" />
+              <p className="text-xs text-red-600">{postError}</p>
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={posting}
+            className={`w-full py-2.5 rounded-lg text-sm font-bold transition-opacity ${
+              posting ? 'bg-nephro-primary/60 text-white cursor-not-allowed' : 'bg-nephro-primary text-white'
+            }`}
+          >
+            {posting ? 'Posting…' : 'Post Discussion'}
+          </button>
         </form>
       </div>
 

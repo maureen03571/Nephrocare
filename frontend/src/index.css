@@ -16,6 +16,25 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
     margin: 0;
     padding: 0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  [data-theme='blue'] {
+    --color-nephro-dark: #0d2b3d;
+    --color-nephro-primary: #1a4a6b;
+    --color-nephro-light: #2d6a8f;
+    --color-nephro-accent: #6ca8d9;
+    --color-nephro-accentLight: #77c5e8;
+    --color-nephro-bg: #eef4f7;
+  }
+
+  [data-theme='warm'] {
+    --color-nephro-dark: #3d1a0d;
+    --color-nephro-primary: #8a3619;
+    --color-nephro-light: #b05c3c;
+    --color-nephro-accent: #e8a87c;
+    --color-nephro-accentLight: #f2c9ab;
+    --color-nephro-bg: #fbf5f2;
   }
 }
 
