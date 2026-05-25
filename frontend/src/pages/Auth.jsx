@@ -138,7 +138,15 @@ const Auth = () => {
                     navigate('/patient/home');
                   }
                 } catch (err) {
-                  setError('Google Sign-In failed');
+                  if (err.code === 'auth/operation-not-allowed') {
+                    setError('Google Sign-In is not enabled in Firebase Console. Please enable it in the Sign-in Method tab.');
+                  } else if (err.code === 'auth/unauthorized-domain') {
+                    setError('This domain is not authorized for Google Sign-In. Add it in Firebase Console Settings.');
+                  } else if (err.code === 'auth/popup-closed-by-user') {
+                    setError('Sign-in popup closed before completion.');
+                  } else {
+                    setError('Google Sign-In failed. Check console for details.');
+                  }
                 }
               }}
               className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 py-3.5 rounded-2xl font-bold text-gray-700 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm"
