@@ -209,6 +209,19 @@ app.post('/api/auth/register', (req, res) => {
   res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name } });
 });
 
+app.post('/api/auth/verify', (req, res) => {
+  const { userId, password } = req.body;
+  if (!userId || !password) {
+    return res.status(400).json({ success: false, message: 'userId and password are required' });
+  }
+  const user = dataStore.users.find(u => u.id === userId && u.password === password);
+  if (user) {
+    res.json({ success: true, message: 'Password verified' });
+  } else {
+    res.status(401).json({ success: false, message: 'Incorrect password' });
+  }
+});
+
 app.get('/api/patient/:id/onboarding', (req, res) => {
   const onboarding = dataStore.onboarding[req.params.id] || null;
   res.json({ success: true, onboarding });
