@@ -3,12 +3,13 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 // TODO: Replace with your actual Firebase config
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCas8Wcmt6Wsi1cxrVf4iXkJikvChsEqZU",
+  authDomain: "nephrocare-77fff.firebaseapp.com",
+  projectId: "nephrocare-77fff",
+  storageBucket: "nephrocare-77fff.firebasestorage.app",
+  messagingSenderId: "73142430372",
+  appId: "1:73142430372:web:b61a018b320ce2d0682391",
+  measurementId: "G-QW1VVHCX1L"
 };
 
 const app = initializeApp(firebaseConfig);
