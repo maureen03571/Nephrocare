@@ -179,9 +179,16 @@ app.get('/api/users/doctors', (req, res) => {
 });
 
 app.get('/api/users/patients', (req, res) => {
-  // Return all patients with profiles
+  // Return all patients with profiles, meds, symptoms etc for doctors
   const patients = dataStore.users.filter(u => u.role === 'patient').map(p => ({
-    id: p.id, name: p.name, email: p.email, profile: dataStore.profiles[p.id] || {}
+    id: p.id, 
+    name: p.name, 
+    email: p.email, 
+    profile: dataStore.profiles[p.id] || {},
+    meds: dataStore.medications[p.id] || [],
+    symptoms: dataStore.symptoms[p.id] || [],
+    onboarding: dataStore.onboarding[p.id] || {},
+    dashboard: getPatientDashboard(p.id)
   }));
   res.json({ success: true, patients });
 });

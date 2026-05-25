@@ -102,16 +102,50 @@ const CaregiverDashboard = () => {
                 <div className="w-8 h-8 border-4 border-nephro-primary border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : patient ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6 relative">
-                <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-nephro-primary to-nephro-accentLight"></div>
-                <div className="p-5 pt-6 flex items-center">
-                  <div className="w-14 h-14 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary shadow-inner mr-4">
-                     <User size={24} />
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
+                  <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-nephro-primary to-nephro-accentLight"></div>
+                  <div className="p-5 pt-6 flex items-center">
+                    <div className="w-14 h-14 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary shadow-inner mr-4">
+                       <User size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-nephro-dark">{patient.name}</h4>
+                      <p className="text-sm text-nephro-primary font-medium">{patient.profile?.condition || 'No Condition Set'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-nephro-dark">{patient.name}</h4>
-                    <p className="text-sm text-nephro-primary font-medium">{patient.profile?.condition || 'No Condition Set'}</p>
-                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CKD Stage</p>
+                      <p className="text-lg font-black text-nephro-dark">{patient.profile?.stage || 'N/A'}</p>
+                   </div>
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Health Score</p>
+                      <p className={`text-lg font-black ${patient.dashboard?.healthScore?.value >= 80 ? 'text-green-500' : 'text-orange-500'}`}>
+                         {patient.dashboard?.healthScore?.value || '--'}%
+                      </p>
+                   </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h4 className="font-bold text-sm text-nephro-dark mb-4 border-b border-gray-50 pb-2 flex items-center">
+                    <ClipboardList size={16} className="mr-2 text-nephro-primary" /> Medications
+                  </h4>
+                  {patient.meds?.length > 0 ? (
+                    <div className="space-y-3">
+                      {patient.meds.map((m, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                          <div>
+                            <p className="text-sm font-bold text-nephro-dark">{m.name}</p>
+                            <p className="text-[10px] text-gray-500">{m.dose} • {m.time}</p>
+                          </div>
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-xs text-gray-400 italic">No medications documented.</p>}
                 </div>
               </div>
             ) : (

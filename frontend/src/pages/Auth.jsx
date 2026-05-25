@@ -122,6 +122,31 @@ const Auth = () => {
               {isLogin ? 'LOG IN' : 'SIGN UP'}
             </button>
           </form>
+
+          <div className="mt-6">
+            <div className="relative flex items-center justify-center mb-6">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink mx-4 text-xs font-bold text-gray-400">OR</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <button
+              onClick={async () => {
+                try {
+                  const googleUser = await signInWithGoogle();
+                  if (googleUser) {
+                    navigate('/patient/home');
+                  }
+                } catch (err) {
+                  setError('Google Sign-In failed');
+                }
+              }}
+              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 py-3.5 rounded-2xl font-bold text-gray-700 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              Sign in with Google
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 text-center bg-white/30 backdrop-blur-sm p-5 rounded-3xl mx-4 border border-white/50 shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
