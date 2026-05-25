@@ -19,7 +19,6 @@ const PatientSetup = () => {
   });
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [password, setPassword] = useState('');
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -28,17 +27,7 @@ const PatientSetup = () => {
     setErrorMessage('');
     setSaving(true);
     try {
-      // 1. Verify Password
-      const verifyRes = await axios.post(`${API_BASE_URL}/api/auth/verify`, {
-        userId: user.id,
-        password: password
-      });
-
-      if (!verifyRes.data.success) {
-        throw new Error('Invalid password');
-      }
-
-      // 2. Save Profile
+      // Save Profile
       await axios.put(`${API_BASE_URL}/api/patient/${user.id}/profile`, {
         name: formData.name,
         condition: formData.condition,
@@ -157,21 +146,6 @@ const PatientSetup = () => {
             placeholder="e.g. Lisinopril, Furosemide"
             className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none"
           />
-        </div>
-
-        <div className="pt-4 border-t border-gray-100">
-          <label className="block text-sm font-medium text-nephro-dark mb-1">Confirm Password to Save</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none bg-white"
-          />
-          <p className="text-[10px] text-gray-400 mt-1.5 flex items-center">
-            <span className="mr-1">🔒</span> Your password is required to verify changes to your health profile.
-          </p>
         </div>
 
         <button

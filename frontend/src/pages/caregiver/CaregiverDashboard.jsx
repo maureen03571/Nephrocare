@@ -11,19 +11,51 @@ const CaregiverDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [linkCode, setLinkCode] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
 
   React.useEffect(() => {
-    // For now, caregiver sees the first registered patient as their "assigned" one
-    // In a real app, this would be a specific assignment join table
-    axios.get(`${API_BASE_URL}/api/users/patients`)
-      .then(res => {
-        if (res.data.patients && res.data.patients.length > 0) {
-          setPatient(res.data.patients[0]);
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+    fetchLinkedPatient();
+  }, [user?.id]);
+
+  const fetchLinkedPatient = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE_URL}/api/caregiver/${user.id}/patient`);
+      if (res.data.success) {
+        setPatient(res.data.patient);
+      }
+    } catch (err) {
+      console.error('No patient linked or failed to fetch', err);
+      setPatient(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLinkPatient = async (e) => {
+    e.preventDefault();
+    if (!linkCode.trim()) return;
+    
+    setIsLinking(true);
+    setLinkError('');
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/caregiver/link-patient`, {
+        caregiverId: user.id,
+        linkCode: linkCode.toUpperCase().trim()
+      });
+      
+      if (res.data.success) {
+        alert(`Successfully linked to ${res.data.patientName}!`);
+        fetchLinkedPatient();
+      }
+    } catch (err) {
+      setLinkError(err.response?.data?.message || 'Invalid link code. Please try again.');
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -83,9 +115,40 @@ const CaregiverDashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 text-center mb-6">
-                <User size={32} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-sm text-gray-500 font-medium">No patients currently assigned <br/> to your care profile.</p>
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm mb-6">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary mb-4">
+                    <User size={32} />
+                  </div>
+                  <h4 className="text-lg font-bold text-nephro-dark mb-1">Link a Patient</h4>
+                  <p className="text-sm text-gray-500 mb-6 px-4">Enter the unique link code provided by your patient to securely connect to their care status.</p>
+                  
+                  <form onSubmit={handleLinkPatient} className="w-full max-w-xs">
+                    <div className="relative mb-3">
+                      <input 
+                        type="text" 
+                        maxLength={6}
+                        value={linkCode}
+                        onChange={(e) => setLinkCode(e.target.value.toUpperCase())}
+                        placeholder="ENTER CODE (e.g. AB12CD)"
+                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl py-3 px-4 text-center font-mono font-bold tracking-widest text-nephro-primary focus:border-nephro-primary focus:bg-white outline-none transition-all placeholder:font-sans placeholder:tracking-normal placeholder:text-gray-300"
+                        required
+                      />
+                    </div>
+                    {linkError && <p className="text-xs text-red-500 font-medium mb-3">⚠️ {linkError}</p>}
+                    <button 
+                      type="submit"
+                      disabled={isLinking || !linkCode}
+                      className="w-full bg-nephro-primary text-white font-bold py-3 rounded-xl shadow-md shadow-nephro-primary/10 hover:bg-nephro-dark active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-50"
+                    >
+                      {isLinking ? (
+                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        'Connect Account'
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
             )}
 

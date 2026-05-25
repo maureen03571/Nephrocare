@@ -60,6 +60,7 @@ const Profile = () => {
   const [onboarding, setOnboarding] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [linkCode, setLinkCode] = useState('');
 
   /* Modal state */
   const [modal, setModal] = useState(null); // 'notifications' | 'privacy' | 'settings'
@@ -100,6 +101,10 @@ const Profile = () => {
         setOnboarding(onboardingRes.data.onboarding || null);
         setDashboard(dashboardRes.data.dashboard || null);
         setAppointments(appointmentsRes.data.appointments || []);
+        
+        // Fetch link code
+        const codeRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/link-code`);
+        setLinkCode(codeRes.data.linkCode);
       } catch (error) {
         console.error('Failed to load profile summary', error);
       }
@@ -160,6 +165,31 @@ const Profile = () => {
         <p className="text-xs text-gray-600 mt-1">Creatinine: <span className="font-semibold">{onboarding?.baselineLabs?.creatinine || '--'}</span></p>
         <p className="text-xs text-gray-600 mt-1">Dialysis status: <span className="font-semibold">{String(profile?.treatments || '').toLowerCase().includes('dialysis') ? 'On dialysis' : 'Not on dialysis'}</span></p>
         <p className="text-xs text-gray-600 mt-1">Symptoms tracked: <span className="font-semibold">{dashboard?.quickStats?.symptomsLogged ?? 0}</span></p>
+      </div>
+
+      {/* 🔗 Caregiver Linking Section */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-nephro-primary/10 mb-4 relative overflow-hidden">
+        <div className="absolute right-0 top-0 p-3 opacity-10">
+          <Shield size={64} className="text-nephro-primary" />
+        </div>
+        <h4 className="text-sm font-bold text-nephro-dark mb-1">Share Access with Caregiver</h4>
+        <p className="text-xs text-gray-500 mb-4">Give this code to your caregiver to link your health updates.</p>
+        
+        <div className="flex items-center space-x-3">
+          <div className="flex-1 bg-nephro-bg border-2 border-dashed border-nephro-primary/30 rounded-xl p-3 flex items-center justify-center">
+            <span className="text-2xl font-mono font-black tracking-widest text-nephro-primary">{linkCode || '------'}</span>
+          </div>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(linkCode);
+              alert('Link code copied to clipboard!');
+            }}
+            className="bg-nephro-primary text-white p-3 rounded-xl shadow-md active:scale-95 transition-all"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-3 italic text-center">Codes are unique and secure. Share only with someone you trust.</p>
       </div>
 
       {/* Care Team */}
