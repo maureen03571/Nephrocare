@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, googleProvider } from '../firebaseConfig';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+
+let auth = null;
+let googleProvider = null;
+
+try {
+  const firebaseModule = await import('../firebaseConfig');
+  auth = firebaseModule.auth;
+  googleProvider = firebaseModule.googleProvider;
+} catch (err) {
+  console.warn('Firebase initialization failed:', err.message);
+}
 
 const AuthContext = createContext();
 
@@ -14,27 +24,48 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const storedUser = localStorage.getItem('nephro_user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        // If logged in via Firebase, we might need to fetch their role from our backend
-        // For now, we'll assume they are a patient or use their existing local data
-        const userData = {
-          id: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName,
-          role: 'patient', // Default role for Google Sign-In
-          isGoogle: true
-        };
-        setUser(userData);
-        localStorage.setItem('nephro_user', JSON.stringify(userData));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        localStorage.removeItem('nephro_user');
       }
-      setLoading(false);
-    });
+    }
 
-    return () => unsubscribe();
+    // Safety timeout — if Firebase never responds, stop loading after 3s
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+    
+    if (auth) {
+      try {
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          clearTimeout(safetyTimer);
+          if (firebaseUser) {
+            const userData = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName,
+              role: 'patient',
+              isGoogle: true
+            };
+            setUser(userData);
+            localStorage.setItem('nephro_user', JSON.stringify(userData));
+          }
+          setLoading(false);
+        });
+        return () => { clearTimeout(safetyTimer); unsubscribe(); };
+      } catch (err) {
+        console.warn('Firebase auth listener failed:', err.message);
+        clearTimeout(safetyTimer);
+        setLoading(false);
+      }
+    } else {
+      // No Firebase — just use localStorage
+      clearTimeout(safetyTimer);
+      setLoading(false);
+    }
+
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   const login = (userData) => {
@@ -45,10 +76,15 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setUser(null);
     localStorage.removeItem('nephro_user');
-    await signOut(auth);
+    if (auth) {
+      try { await signOut(auth); } catch (e) {}
+    }
   };
 
   const signInWithGoogle = async () => {
+    if (!auth || !googleProvider) {
+      throw new Error('Firebase is not configured. Google Sign-In is unavailable.');
+    }
     try {
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;
