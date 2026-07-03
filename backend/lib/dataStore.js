@@ -21,7 +21,8 @@ const defaultDataStore = () => ({
   healthScores: {},
   streaks: {},
   alerts: {},
-  dailyActions: {}
+  dailyActions: {},
+  doctorNotes: {}
 });
 
 const ensureSchema = (raw) => ({
@@ -43,7 +44,8 @@ const ensureSchema = (raw) => ({
   healthScores: raw?.healthScores && typeof raw.healthScores === 'object' ? raw.healthScores : {},
   streaks: raw?.streaks && typeof raw.streaks === 'object' ? raw.streaks : {},
   alerts: raw?.alerts && typeof raw.alerts === 'object' ? raw.alerts : {},
-  dailyActions: raw?.dailyActions && typeof raw.dailyActions === 'object' ? raw.dailyActions : {}
+  dailyActions: raw?.dailyActions && typeof raw.dailyActions === 'object' ? raw.dailyActions : {},
+  doctorNotes: raw?.doctorNotes && typeof raw.doctorNotes === 'object' ? raw.doctorNotes : {}
 });
 
 const loadDataStore = () => {

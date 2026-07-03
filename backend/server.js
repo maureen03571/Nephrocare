@@ -229,6 +229,35 @@ app.post('/api/auth/verify', (req, res) => {
   }
 });
 
+// Google Sign-In sync - registers or updates a Google user in the local DB
+app.post('/api/auth/google-sync', (req, res) => {
+  const { uid, email, name, role } = req.body;
+  if (!uid || !email) {
+    return res.status(400).json({ success: false, message: 'uid and email are required' });
+  }
+  // Check if user already exists by google UID or email
+  let user = dataStore.users.find(u => u.googleUid === uid || u.email === email);
+  if (!user) {
+    user = {
+      id: uid,
+      googleUid: uid,
+      email,
+      name: name || email.split('@')[0],
+      role: role || 'patient',
+      isGoogle: true
+    };
+    dataStore.users.push(user);
+    saveData();
+  } else if (!user.googleUid) {
+    // Link existing email account to Google
+    user.googleUid = uid;
+    user.isGoogle = true;
+    if (name && !user.name) user.name = name;
+    saveData();
+  }
+  res.json({ success: true, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
+});
+
 // Caregiver-Patient Linking
 app.get('/api/patient/:id/link-code', (req, res) => {
   const user = dataStore.users.find(u => u.id === req.params.id);
@@ -541,13 +570,42 @@ app.get('/api/patient/:id/appointments', (req, res) => {
   res.json({ success: true, appointments: dataStore.appointments[req.params.id] || [] });
 });
 
+app.post('/api/patient/:id/appointments', (req, res) => {
+  const { title, date, doctorName, notes } = req.body || {};
+  if (!title || !date) {
+    return res.status(400).json({ success: false, message: 'title and date are required' });
+  }
+  if (!dataStore.appointments[req.params.id]) dataStore.appointments[req.params.id] = [];
+  const appt = { id: uuidv4(), title, date, doctorName: doctorName || '', notes: notes || '', createdAt: new Date().toISOString() };
+  dataStore.appointments[req.params.id].push(appt);
+  saveData();
+  res.json({ success: true, appointment: appt });
+});
+
+// Doctor Notes
+app.get('/api/patient/:id/notes', (req, res) => {
+  res.json({ success: true, notes: dataStore.doctorNotes[req.params.id] || [] });
+});
+
+app.post('/api/patient/:id/notes', (req, res) => {
+  const { doctorId, doctorName, content } = req.body || {};
+  if (!content || !String(content).trim()) {
+    return res.status(400).json({ success: false, message: 'content is required' });
+  }
+  if (!dataStore.doctorNotes[req.params.id]) dataStore.doctorNotes[req.params.id] = [];
+  const note = { id: uuidv4(), doctorId: doctorId || '', doctorName: doctorName || 'Doctor', content: String(content).trim(), createdAt: new Date().toISOString() };
+  dataStore.doctorNotes[req.params.id].push(note);
+  saveData();
+  res.json({ success: true, note });
+});
+
 // Community / Socials
 app.get('/api/community/messages', (req, res) => {
   if (!Array.isArray(dataStore.communityMessages) || dataStore.communityMessages.length === 0) {
     dataStore.communityMessages = [
       {
         id: uuidv4(),
-        senderName: 'NephroCare Guide',
+        senderName: 'RenAmi Guide',
         senderId: 'system',
         topic: 'Tips for staying hydrated',
         content: 'What helps you stay within your daily fluid target without feeling too thirsty?',
@@ -556,7 +614,7 @@ app.get('/api/community/messages', (req, res) => {
       },
       {
         id: uuidv4(),
-        senderName: 'NephroCare Guide',
+        senderName: 'RenAmi Guide',
         senderId: 'system',
         topic: 'Best low-potassium snacks',
         content: 'Share your favorite low-potassium snack ideas that are easy to prepare.',
@@ -565,7 +623,7 @@ app.get('/api/community/messages', (req, res) => {
       },
       {
         id: uuidv4(),
-        senderName: 'NephroCare Guide',
+        senderName: 'RenAmi Guide',
         senderId: 'system',
         topic: 'How do you remember medications?',
         content: 'What reminder routine works best for your medication schedule?',
@@ -694,11 +752,11 @@ app.post('/api/ai/chat', async (req, res) => {
   // Save user message
   dataStore.aiHistory[userId].push({ role: 'user', text: message });
   
-  let reply = "Hello! I am NephroCare AI.";
+  let reply = "Hello! I am RenAmi AI.";
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
     
-    const systemInstruction = `You are NephroCare AI, a compassionate kidney health assistant.
+    const systemInstruction = `You are RenAmi AI, a compassionate kidney health assistant.
 INSTRUCTIONS:
 1. Respond to the user's latest message in a friendly, empathetic, and concise way (max 3 sentences).
 2. NEVER introduce yourself formally in every message. You must acknowledge ALL issues even generic symptoms like headaches, fatigue, or nausea. Do NOT say "I am a kidney health assistant. How can I help you regarding your diet, symptoms, or general renal care?" 

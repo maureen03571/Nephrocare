@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
@@ -19,6 +19,37 @@ const PatientSetup = () => {
   });
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    const fetchExistingData = async () => {
+      if (!user?.id) return;
+      try {
+        const [profileRes, onboardingRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`)
+        ]);
+
+        const profile = profileRes.data.profile || {};
+        const onboarding = onboardingRes.data.onboarding || {};
+
+        setFormData({
+          name: profile.name || user?.name || '',
+          condition: profile.condition || '',
+          stage: profile.stage || onboarding.ckdStage || 'Stage 1',
+          diagnosisDate: profile.diagnosisDate || '',
+          treatments: profile.treatments || '',
+          baselineGfr: onboarding.baselineLabs?.gfr || '',
+          baselineCreatinine: onboarding.baselineLabs?.creatinine || '',
+          medicationList: Array.isArray(onboarding.medicationList)
+            ? onboarding.medicationList.join(', ')
+            : ''
+        });
+      } catch (err) {
+        console.error('Failed to fetch existing profile data', err);
+      }
+    };
+    fetchExistingData();
+  }, [user?.id, user?.name]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -72,7 +103,7 @@ const PatientSetup = () => {
           ← Back to Home
         </button>
         <h2 className="text-2xl font-bold text-nephro-primary">Setup Your Profile</h2>
-        <p className="text-sm text-gray-500 mt-1">Let's personalize your NephroCare experience.</p>
+        <p className="text-sm text-gray-500 mt-1">Let's personalize your RenAmi experience.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">

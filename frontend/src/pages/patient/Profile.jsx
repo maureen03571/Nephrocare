@@ -218,7 +218,7 @@ const Profile = () => {
       >
         <LogOut size={20} className="mr-2" /> Log Out
       </button>
-      <p className="text-center text-xs text-gray-400 mt-8 mb-4">NephroCare v1.0.0</p>
+      <p className="text-center text-xs text-gray-400 mt-8 mb-4">RenAmi v1.0.0</p>
 
       {/* ── Notifications Modal ── */}
       {modal === 'notifications' && (
@@ -257,7 +257,7 @@ const Profile = () => {
           <div className="space-y-3 text-sm text-gray-700">
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="font-bold text-blue-800 mb-1">🔒 Your data is secure</p>
-              <p className="text-xs text-blue-700 leading-relaxed">All health data is stored on secure NephroCare infrastructure. Your information is never sold or shared with third parties without your explicit consent.</p>
+              <p className="text-xs text-blue-700 leading-relaxed">All health data is stored on secure RenAmi infrastructure. Your information is never sold or shared with third parties without your explicit consent.</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2">
               <p className="text-xs text-gray-600"><span className="font-semibold">Data storage:</span> Your records are stored in an encrypted backend database.</p>

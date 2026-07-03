@@ -75,7 +75,7 @@ const CareTeam = () => {
             </div>
           ))}
           {doctors.length === 0 && (
-            <p className="text-center text-gray-400 text-sm py-10">No doctors available on NephroCare yet.</p>
+            <p className="text-center text-gray-400 text-sm py-10">No doctors available on RenAmi yet.</p>
           )}
         </div>
       </div>

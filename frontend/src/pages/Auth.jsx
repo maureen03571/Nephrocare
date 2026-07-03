@@ -13,7 +13,7 @@ const Auth = () => {
   const [error, setError] = useState('');
   
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,7 +53,7 @@ const Auth = () => {
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
           <p className="text-nephro-dark/70 mt-2 font-medium text-lg">
-            {isLogin ? 'Log in to continue to NephroCare' : 'Join NephroCare today'}
+            {isLogin ? 'Log in to continue to RenAmi' : 'Join RenAmi today'}
           </p>
         </div>
 
@@ -131,11 +131,38 @@ const Auth = () => {
             </div>
 
             <button
+              type="button"
               onClick={async () => {
+                console.log('DEBUG: Google login button clicked');
                 try {
                   const googleUser = await signInWithGoogle();
                   if (googleUser) {
-                    navigate('/patient/home');
+                    const syncRes = await axios.post(`${API_BASE_URL}/api/auth/google-sync`, {
+                      uid: googleUser.uid,
+                      email: googleUser.email,
+                      name: googleUser.displayName,
+                      role: role
+                    });
+                    if (syncRes.data.success) {
+                      login(syncRes.data.user);
+                      if (syncRes.data.user.role === 'patient') {
+                        // Check if onboarding/profile is set up
+                        try {
+                          const profileRes = await axios.get(`${API_BASE_URL}/api/patient/${syncRes.data.user.id}/profile`);
+                          if (profileRes.data && profileRes.data.profile && profileRes.data.profile.age) {
+                            navigate('/patient/home');
+                          } else {
+                            navigate('/patient/setup');
+                          }
+                        } catch (err) {
+                          navigate('/patient/setup');
+                        }
+                      } else if (syncRes.data.user.role === 'doctor') {
+                        navigate('/doctor');
+                      } else if (syncRes.data.user.role === 'caregiver') {
+                        navigate('/caregiver');
+                      }
+                    }
                   }
                 } catch (err) {
                   if (err.code === 'auth/operation-not-allowed') {
@@ -145,7 +172,7 @@ const Auth = () => {
                   } else if (err.code === 'auth/popup-closed-by-user') {
                     setError('Sign-in popup closed before completion.');
                   } else {
-                    setError('Google Sign-In failed. Check console for details.');
+                    setError(`Google Sign-In failed (${err.code || err.message || 'Unknown Error'}). Check console.`);
                   }
                 }
               }}

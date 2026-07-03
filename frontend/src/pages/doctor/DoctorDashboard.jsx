@@ -13,6 +13,13 @@ const DoctorDashboard = () => {
   const [dmInput, setDmInput] = useState('');
   const [dmMessages, setDmMessages] = useState([]);
 
+  // Doctor notes & appointments state
+  const [patientNotes, setPatientNotes] = useState([]);
+  const [newNote, setNewNote] = useState('');
+  const [patientAppointments, setPatientAppointments] = useState([]);
+  const [apptTitle, setApptTitle] = useState('');
+  const [apptDate, setApptDate] = useState('');
+
   useEffect(() => {
     // Fetch real patients
     axios.get(`${API_BASE_URL}/api/users/patients`).then(res => {
@@ -42,6 +49,55 @@ const DoctorDashboard = () => {
     setDmMessages(prev => [...prev, { id: 'dt'+Date.now(), ...payload, timestamp: new Date().toISOString() }]);
     setDmInput('');
     await axios.post(`${API_BASE_URL}/api/dm`, payload);
+  };
+
+  useEffect(() => {
+    if (selectedPatientId) {
+      axios.get(`${API_BASE_URL}/api/patient/${selectedPatientId}/notes`).then(res => {
+        setPatientNotes(res.data.notes || []);
+      }).catch(() => {});
+
+      axios.get(`${API_BASE_URL}/api/patient/${selectedPatientId}/appointments`).then(res => {
+        setPatientAppointments(res.data.appointments || []);
+      }).catch(() => {});
+    }
+  }, [selectedPatientId]);
+
+  const handleAddNote = async (e) => {
+    e.preventDefault();
+    if (!newNote.trim() || !selectedPatientId) return;
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/patient/${selectedPatientId}/notes`, {
+        doctorId: user.id,
+        doctorName: user.name,
+        content: newNote
+      });
+      if (res.data.success) {
+        setPatientNotes(prev => [...prev, res.data.note]);
+        setNewNote('');
+      }
+    } catch (err) {
+      alert('Failed to save note');
+    }
+  };
+
+  const handleAddAppointment = async (e) => {
+    e.preventDefault();
+    if (!apptTitle.trim() || !apptDate || !selectedPatientId) return;
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/patient/${selectedPatientId}/appointments`, {
+        title: apptTitle,
+        date: apptDate,
+        doctorName: user.name
+      });
+      if (res.data.success) {
+        setPatientAppointments(prev => [...prev, res.data.appointment]);
+        setApptTitle('');
+        setApptDate('');
+      }
+    } catch (err) {
+      alert('Failed to schedule appointment');
+    }
   };
 
   return (
@@ -158,24 +214,112 @@ const DoctorDashboard = () => {
                 ) : <p className="text-xs text-gray-400 italic">No medications recorded.</p>}
               </div>
 
-              <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-                <h4 className="font-bold text-sm text-nephro-dark mb-4 border-b border-gray-50 pb-2 flex items-center">
-                   <Activity size={16} className="mr-2 text-nephro-primary" /> Progress Tracking
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="p-3 bg-blue-50 rounded-2xl">
-                      <p className="text-[10px] font-bold text-blue-500 uppercase">Fluid (Today)</p>
-                      <p className="text-base font-black text-blue-700">{p.dashboard?.quickStats?.fluidTodayMl || 0} mL</p>
+               <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
+                 <h4 className="font-bold text-sm text-nephro-dark mb-4 border-b border-gray-50 pb-2 flex items-center">
+                    <Activity size={16} className="mr-2 text-nephro-primary" /> Progress Tracking
+                 </h4>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-blue-50 rounded-2xl">
+                       <p className="text-[10px] font-bold text-blue-500 uppercase">Fluid (Today)</p>
+                       <p className="text-base font-black text-blue-700">{p.dashboard?.quickStats?.fluidTodayMl || 0} mL</p>
+                    </div>
+                    <div className="p-3 bg-purple-50 rounded-2xl">
+                       <p className="text-[10px] font-bold text-purple-500 uppercase">Symptoms</p>
+                       <p className="text-base font-black text-purple-700">{p.dashboard?.quickStats?.symptomsLogged || 0} Logged</p>
+                    </div>
+                 </div>
+               </div>
+
+               {/* Clinical Notes Card */}
+               <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
+                 <h4 className="font-bold text-sm text-nephro-dark mb-4 border-b border-gray-50 pb-2 flex items-center">
+                   <ClipboardList size={16} className="mr-2 text-nephro-primary" /> Clinical Notes
+                 </h4>
+                 
+                 {patientNotes.length > 0 ? (
+                   <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                     {patientNotes.map((n) => (
+                       <div key={n.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
+                         <div className="flex justify-between items-center text-gray-400 font-bold mb-1">
+                           <span>By Dr. {n.doctorName || 'Doctor'}</span>
+                           <span>{new Date(n.createdAt).toLocaleDateString()}</span>
+                         </div>
+                         <p className="text-gray-700 font-medium whitespace-pre-wrap">{n.content}</p>
+                       </div>
+                     ))}
                    </div>
-                   <div className="p-3 bg-purple-50 rounded-2xl">
-                      <p className="text-[10px] font-bold text-purple-500 uppercase">Symptoms</p>
-                      <p className="text-base font-black text-purple-700">{p.dashboard?.quickStats?.symptomsLogged || 0} Logged</p>
+                 ) : (
+                   <p className="text-xs text-gray-400 italic mb-4">No clinical notes recorded for this patient.</p>
+                 )}
+
+                 <form onSubmit={handleAddNote} className="space-y-2">
+                   <textarea
+                     rows="2"
+                     value={newNote}
+                     onChange={(e) => setNewNote(e.target.value)}
+                     placeholder="Add a clinical note (e.g. reviewed lab results, advised fluid restriction)..."
+                     className="w-full text-xs p-3 bg-gray-50 rounded-xl focus:outline-none focus:bg-white border border-transparent focus:border-nephro-primary/20 resize-none font-medium text-gray-700"
+                   />
+                   <button
+                     type="submit"
+                     disabled={!newNote.trim()}
+                     className="w-full py-2 bg-nephro-primary hover:bg-nephro-dark text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+                   >
+                     Save Clinical Note
+                   </button>
+                 </form>
+               </div>
+
+               {/* Appointment Scheduler Card */}
+               <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
+                 <h4 className="font-bold text-sm text-nephro-dark mb-4 border-b border-gray-50 pb-2 flex items-center">
+                   <Calendar size={16} className="mr-2 text-nephro-primary" /> Schedule &amp; Reminders
+                 </h4>
+
+                 {patientAppointments.length > 0 ? (
+                   <div className="space-y-3 mb-4">
+                     {patientAppointments.map((a) => (
+                       <div key={a.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl text-xs">
+                         <div>
+                           <p className="font-bold text-gray-700">{a.title}</p>
+                           <p className="text-[10px] text-gray-400 mt-0.5">{new Date(a.date).toLocaleString()}</p>
+                         </div>
+                         <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wide font-mono">Scheduled</span>
+                       </div>
+                     ))}
                    </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+                 ) : (
+                   <p className="text-xs text-gray-400 italic mb-4">No upcoming appointments scheduled.</p>
+                 )}
+
+                 <form onSubmit={handleAddAppointment} className="space-y-3">
+                   <div className="grid grid-cols-2 gap-2">
+                     <input
+                       type="text"
+                       value={apptTitle}
+                       onChange={(e) => setApptTitle(e.target.value)}
+                       placeholder="Purpose..."
+                       className="text-xs p-2.5 bg-gray-50 rounded-xl focus:outline-none focus:bg-white border border-transparent focus:border-nephro-primary/20 font-medium text-gray-700"
+                     />
+                     <input
+                       type="datetime-local"
+                       value={apptDate}
+                       onChange={(e) => setApptDate(e.target.value)}
+                       className="text-xs p-2.5 bg-gray-50 rounded-xl focus:outline-none focus:bg-white border border-transparent focus:border-nephro-primary/20 font-medium text-gray-700 bg-white"
+                     />
+                   </div>
+                   <button
+                     type="submit"
+                     disabled={!apptTitle.trim() || !apptDate}
+                     className="w-full py-2.5 bg-nephro-dark hover:bg-nephro-primary text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+                   >
+                     Schedule &amp; Send Reminder
+                   </button>
+                 </form>
+               </div>
+             </div>
+           );
+         })()}
 
         {activeTab === 'messages' && (
           <div className="h-full flex flex-col pt-2 relative">
@@ -221,6 +365,12 @@ const DoctorDashboard = () => {
                  <button onClick={() => setActiveTab('overview')} className="mt-8 text-white font-black text-sm bg-nephro-primary px-8 py-3.5 rounded-full shadow-lg shadow-nephro-primary/20 hover:scale-105 active:scale-95 transition-all">Go to Patient List</button>
                </div>
              )}
+          </div>
+        )}
+
+        {activeTab === 'ai' && (
+          <div className="h-full flex flex-col pt-2">
+            <AIChat customTitle="Doctor Clinical AI" customSubtitle="RenAmi AI Assistant for Clinical Guidance" />
           </div>
         )}
       </div>

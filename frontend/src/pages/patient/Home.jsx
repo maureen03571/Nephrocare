@@ -31,9 +31,9 @@ const Home = () => {
       }
       const timer = setTimeout(() => {
         if (Notification.permission === 'granted') {
-          new Notification('NephroCare Reminder', { body: 'Time for your 1L water intake and Lisinopril!' });
+          new Notification('RenAmi Reminder', { body: 'Time for your 1L water intake and Lisinopril!' });
         } else {
-          alert('NephroCare Reminder: Time for your 1L water intake and Lisinopril!');
+          alert('RenAmi Reminder: Time for your 1L water intake and Lisinopril!');
         }
       }, 3000);
       return () => clearTimeout(timer);
