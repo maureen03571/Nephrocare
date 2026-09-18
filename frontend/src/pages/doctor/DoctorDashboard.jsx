@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { Users, LogOut, MessageCircle, Bot } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AIChat from '../../components/AIChat';
 import { API_BASE_URL } from '../../config';
 
 const DoctorDashboard = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [activeTab, setActiveTab] = useState('overview'); // overview, messages
   const [selectedPatientId, setSelectedPatientId] = useState(null);
@@ -35,6 +37,11 @@ const DoctorDashboard = () => {
     }
   }, [activeTab, selectedPatientId, user.id]);
 
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
   const handleSendDM = async (e) => {
     e.preventDefault();
     if (!dmInput.trim() || !selectedPatientId) return;
@@ -54,7 +61,7 @@ const DoctorDashboard = () => {
              <h2 className="text-2xl font-black tracking-tight drop-shadow-sm">Dr. {user.name}</h2>
              <p className="text-nephro-accentLight/80 text-sm font-semibold mt-1">Doctor Portal</p>
            </div>
-           <button onClick={logout} className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full transition-all text-white border border-white/10">
+           <button onClick={handleLogout} className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full transition-all text-white border border-white/10">
              <LogOut size={20} />
            </button>
          </div>
@@ -133,6 +140,12 @@ const DoctorDashboard = () => {
                  <button onClick={() => setActiveTab('overview')} className="mt-6 text-nephro-primary font-bold text-sm bg-white px-6 py-2.5 rounded-full shadow-sm hover:shadow-md transition-all">Back to Overview</button>
                </div>
              )}
+          </div>
+        )}
+
+        {activeTab === 'ai' && (
+          <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden" style={{ height: 'calc(100vh - 220px)' }}>
+            <AIChat customTitle="Clinical AI Assist" customSubtitle="Draft patient guidance and care summaries" />
           </div>
         )}
       </div>

@@ -4,6 +4,15 @@ const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const { loadDataStore, saveDataStore } = require('./lib/dataStore');
+const { seedDemoAccounts } = require('./lib/seed');
+const {
+  hashPassword,
+  verifyPassword,
+  isBcryptHash,
+  migrateStoredPasswords,
+  verifyGoogleToken,
+  toPublicUser
+} = require('./lib/auth');
 const {
   validateAuthRegister,
   validateSymptomPayload,
@@ -20,6 +29,7 @@ let dataStore = loadDataStore();
 const saveData = () => {
   saveDataStore(dataStore);
 };
+
 
 const toNumber = (value) => {
   const n = Number(value);
@@ -160,6 +170,18 @@ const priorityActionCatalog = {
   }
 };
 
+const patientOnDialysis = (patientId) => {
+  const profile = dataStore.profiles[patientId] || {};
+  const treatments = String(profile.treatments || '').toLowerCase();
+  return treatments.includes('dialysis');
+};
+
+const getPriorityActionTypes = (patientId) => {
+  const types = ['hydration', 'medication', 'weight'];
+  if (patientOnDialysis(patientId)) types.push('dialysis');
+  return types;
+};
+
 const getDailyActionBucket = (patientId, dayKey = getTodayKey()) => {
   if (!dataStore.dailyActions[patientId]) dataStore.dailyActions[patientId] = {};
   if (!dataStore.dailyActions[patientId][dayKey]) {
@@ -186,27 +208,101 @@ app.get('/api/users/patients', (req, res) => {
   res.json({ success: true, patients });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = dataStore.users.find(u => u.email === email && u.password === password);
-  if (user) {
-    res.json({ success: true, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
-  } else {
-    res.status(401).json({ success: false, message: 'Invalid credentials' });
+  const user = dataStore.users.find((u) => u.email === email);
+
+  if (!user || !user.password) {
+    return res.status(401).json({
+      success: false,
+      message: user?.authProvider === 'google'
+        ? 'This account uses Google Sign-In. Continue with Google instead.'
+        : 'Invalid credentials'
+    });
   }
+
+  const valid = await verifyPassword(password, user.password);
+  if (!valid) {
+    return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+
+  if (!isBcryptHash(user.password)) {
+    user.password = await hashPassword(password);
+    saveData();
+  }
+
+  res.json({ success: true, user: toPublicUser(user) });
 });
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   const { email, password, name, role } = req.body;
   const validationError = validateAuthRegister({ email, password, name, role });
   if (validationError) return res.status(400).json({ success: false, message: validationError });
-  if (dataStore.users.find(u => u.email === email)) {
+  if (dataStore.users.find((u) => u.email === email)) {
     return res.status(400).json({ success: false, message: 'Email already exists' });
   }
-  const newUser = { id: uuidv4(), email, password, name, role };
+
+  const newUser = {
+    id: uuidv4(),
+    email,
+    password: await hashPassword(password),
+    name,
+    role,
+    authProvider: 'local'
+  };
   dataStore.users.push(newUser);
   saveData();
-  res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name } });
+  res.json({ success: true, user: toPublicUser(newUser) });
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  const credential = String(req.body?.credential || '').trim();
+  const requestedRole = req.body?.role;
+
+  if (!credential) {
+    return res.status(400).json({ success: false, message: 'Google credential is required' });
+  }
+
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(503).json({
+      success: false,
+      message: 'Google Sign-In is not configured yet. Add GOOGLE_CLIENT_ID to backend env.'
+    });
+  }
+
+  try {
+    const payload = await verifyGoogleToken(credential);
+    const email = payload?.email;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Google account email is unavailable' });
+    }
+
+    let user = dataStore.users.find((u) => u.email === email);
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      user = {
+        id: uuidv4(),
+        email,
+        name: payload.name || payload.given_name || 'NephroCare User',
+        role: ['patient', 'doctor', 'caregiver'].includes(requestedRole) ? requestedRole : 'patient',
+        authProvider: 'google',
+        googleId: payload.sub
+      };
+      dataStore.users.push(user);
+      saveData();
+    } else if (!user.googleId) {
+      user.googleId = payload.sub;
+      user.authProvider = user.password ? user.authProvider || 'local' : 'google';
+      saveData();
+    }
+
+    res.json({ success: true, user: toPublicUser(user), isNewUser });
+  } catch (error) {
+    console.error('Google auth error:', error.message);
+    res.status(401).json({ success: false, message: 'Google Sign-In failed. Please try again.' });
+  }
 });
 
 app.get('/api/patient/:id/onboarding', (req, res) => {
@@ -242,9 +338,10 @@ app.get('/api/patient/:id/dashboard', (req, res) => {
 app.get('/api/patient/:id/daily-actions', (req, res) => {
   const dayKey = req.query.date || getTodayKey();
   const bucket = getDailyActionBucket(req.params.id, dayKey);
-  const totalActions = Object.keys(priorityActionCatalog).length;
-  const completedCount = Object.values(bucket.completed).filter(Boolean).length;
-  const progressPercent = Math.round((completedCount / totalActions) * 100);
+  const actionTypes = getPriorityActionTypes(req.params.id);
+  const totalActions = actionTypes.length;
+  const completedCount = actionTypes.filter((type) => bucket.completed[type]).length;
+  const progressPercent = totalActions ? Math.round((completedCount / totalActions) * 100) : 0;
 
   res.json({
     success: true,
@@ -261,6 +358,7 @@ app.get('/api/patient/:id/daily-actions', (req, res) => {
 
 app.post('/api/patient/:id/daily-actions/complete', (req, res) => {
   const actionType = String(req.body?.actionType || '').trim();
+  const completed = req.body?.completed === false ? false : true;
   const dayKey = req.body?.date || getTodayKey();
   const catalogItem = priorityActionCatalog[actionType];
 
@@ -270,7 +368,7 @@ app.post('/api/patient/:id/daily-actions/complete', (req, res) => {
 
   const bucket = getDailyActionBucket(req.params.id, dayKey);
 
-  if (!bucket.completed[actionType]) {
+  if (completed && !bucket.completed[actionType]) {
     bucket.history.push({
       id: uuidv4(),
       actionType,
@@ -280,13 +378,18 @@ app.post('/api/patient/:id/daily-actions/complete', (req, res) => {
     });
   }
 
-  bucket.completed[actionType] = true;
+  if (!getPriorityActionTypes(req.params.id).includes(actionType)) {
+    return res.status(400).json({ success: false, message: 'This action is not in your daily checklist' });
+  }
+
+  bucket.completed[actionType] = completed;
   bucket.updatedAt = new Date().toISOString();
   saveData();
 
-  const totalActions = Object.keys(priorityActionCatalog).length;
-  const completedCount = Object.values(bucket.completed).filter(Boolean).length;
-  const progressPercent = Math.round((completedCount / totalActions) * 100);
+  const actionTypes = getPriorityActionTypes(req.params.id);
+  const totalActions = actionTypes.length;
+  const completedCount = actionTypes.filter((type) => bucket.completed[type]).length;
+  const progressPercent = totalActions ? Math.round((completedCount / totalActions) * 100) : 0;
 
   res.json({
     success: true,
@@ -484,7 +587,101 @@ app.post('/api/patient/:id/labs', (req, res) => {
 
 // Appointments
 app.get('/api/patient/:id/appointments', (req, res) => {
-  res.json({ success: true, appointments: dataStore.appointments[req.params.id] || [] });
+  const appointments = (dataStore.appointments[req.params.id] || [])
+    .slice()
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  res.json({ success: true, appointments });
+});
+
+app.post('/api/patient/:id/appointments', (req, res) => {
+  const title = String(req.body?.title || '').trim();
+  const date = req.body?.date;
+  const doctorName = String(req.body?.doctorName || '').trim() || 'Dr. Sarah Kimani';
+
+  if (!title || !date) {
+    return res.status(400).json({ success: false, message: 'title and date are required' });
+  }
+
+  if (!dataStore.appointments[req.params.id]) dataStore.appointments[req.params.id] = [];
+  const appointment = {
+    id: uuidv4(),
+    title,
+    date,
+    doctorName,
+    location: req.body?.location || 'NephroCare Clinic',
+    createdAt: new Date().toISOString()
+  };
+  dataStore.appointments[req.params.id].push(appointment);
+  saveData();
+  res.json({ success: true, appointment });
+});
+
+app.get('/api/patient/:id/food-logs', (req, res) => {
+  const logs = (dataStore.foodLogs[req.params.id] || []).slice().reverse();
+  res.json({ success: true, foodLogs: logs });
+});
+
+app.post('/api/patient/:id/food-logs', (req, res) => {
+  const meal = String(req.body?.meal || '').trim();
+  if (!meal) {
+    return res.status(400).json({ success: false, message: 'meal is required' });
+  }
+
+  if (!dataStore.foodLogs[req.params.id]) dataStore.foodLogs[req.params.id] = [];
+  const entry = {
+    id: uuidv4(),
+    meal,
+    notes: String(req.body?.notes || '').trim(),
+    date: new Date().toISOString()
+  };
+  dataStore.foodLogs[req.params.id].push(entry);
+  saveData();
+  res.json({ success: true, foodLog: entry });
+});
+
+app.get('/api/patient/:id/check-in', (req, res) => {
+  const dayKey = req.query.date || getTodayKey();
+  const checkIn = dataStore.dailyCheckIns[req.params.id]?.[dayKey] || null;
+  res.json({ success: true, date: dayKey, checkIn });
+});
+
+app.post('/api/patient/:id/check-in', (req, res) => {
+  const mood = String(req.body?.mood || '').trim();
+  if (!mood) {
+    return res.status(400).json({ success: false, message: 'mood is required' });
+  }
+
+  const dayKey = req.body?.date || getTodayKey();
+  if (!dataStore.dailyCheckIns[req.params.id]) dataStore.dailyCheckIns[req.params.id] = {};
+  dataStore.dailyCheckIns[req.params.id][dayKey] = {
+    mood,
+    updatedAt: new Date().toISOString()
+  };
+  saveData();
+  res.json({ success: true, date: dayKey, checkIn: dataStore.dailyCheckIns[req.params.id][dayKey] });
+});
+
+app.get('/api/caregiver/:id/patient', (req, res) => {
+  const patientId = dataStore.caregiverAssignments?.[req.params.id];
+  if (!patientId) {
+    return res.json({ success: true, patient: null });
+  }
+
+  const patientUser = dataStore.users.find((user) => user.id === patientId && user.role === 'patient');
+  if (!patientUser) {
+    return res.json({ success: true, patient: null });
+  }
+
+  res.json({
+    success: true,
+    patient: {
+      id: patientUser.id,
+      name: patientUser.name,
+      email: patientUser.email,
+      profile: dataStore.profiles[patientId] || {},
+      dashboard: getPatientDashboard(patientId)
+    }
+  });
 });
 
 // Community / Socials
@@ -744,7 +941,21 @@ INSTRUCTIONS:
   res.json({ success: true, reply });
 });
 
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 3001;
+
+const startServer = async () => {
+  await migrateStoredPasswords(dataStore, saveData);
+  await seedDemoAccounts(dataStore, saveData);
+  app.listen(PORT, () => {
+    console.log(`Backend server running on port ${PORT}`);
+  });
+};
+
+module.exports = app;
+
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}

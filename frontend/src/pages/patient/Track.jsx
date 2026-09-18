@@ -20,14 +20,21 @@ const Track = () => {
   const [mood, setMood] = useState('🙂');
   const [dailyProgress, setDailyProgress] = useState(null);
   const [medicationLogs, setMedicationLogs] = useState([]);
+  const [foodLogs, setFoodLogs] = useState([]);
 
   useEffect(() => {
     const fetchDailyProgress = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/daily-actions`);
-        setDailyProgress(res.data);
-        const medRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/medications`);
+        const [dailyRes, medRes, checkInRes, foodRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/daily-actions`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/medications`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/check-in`),
+          axios.get(`${API_BASE_URL}/api/patient/${user.id}/food-logs`)
+        ]);
+        setDailyProgress(dailyRes.data);
         setMedicationLogs(medRes.data.medications || []);
+        if (checkInRes.data.checkIn?.mood) setMood(checkInRes.data.checkIn.mood);
+        setFoodLogs(foodRes.data.foodLogs || []);
       } catch (error) {
         console.error('Failed to load daily progress', error);
       }
@@ -80,6 +87,23 @@ const Track = () => {
     showSuccess();
   };
 
+  const submitFoodLog = async (e) => {
+    e.preventDefault();
+    if (!foodLog.meal.trim()) return;
+    await axios.post(`${API_BASE_URL}/api/patient/${user.id}/food-logs`, foodLog);
+    setFoodLog({ meal: '', notes: '' });
+    showSuccess();
+  };
+
+  const saveMood = async (nextMood) => {
+    setMood(nextMood);
+    try {
+      await axios.post(`${API_BASE_URL}/api/patient/${user.id}/check-in`, { mood: nextMood });
+    } catch (error) {
+      console.error('Failed to save mood check-in', error);
+    }
+  };
+
   return (
     <div className="p-5">
       <h2 className="text-2xl font-bold text-nephro-dark mb-4">Track Health</h2>
@@ -89,7 +113,7 @@ const Track = () => {
           <Target size={16} className="text-nephro-primary" />
         </div>
         <p className="text-xs text-gray-600">
-          Tumefika {dailyProgress?.progress?.completedCount ?? 0}/{dailyProgress?.progress?.totalActions ?? 3} actions ({dailyProgress?.progress?.progressPercent ?? 0}%)
+          {dailyProgress?.progress?.completedCount ?? 0}/{dailyProgress?.progress?.totalActions ?? 3} daily actions complete ({dailyProgress?.progress?.progressPercent ?? 0}%)
         </p>
         <div className="w-full h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
           <div
@@ -115,7 +139,7 @@ const Track = () => {
             <button
               key={m}
               type="button"
-              onClick={() => setMood(m)}
+              onClick={() => saveMood(m)}
               className={`w-9 h-9 rounded-full text-lg ${mood === m ? 'bg-nephro-primary text-white' : 'bg-white border border-gray-200'}`}
             >
               {m}
@@ -221,7 +245,7 @@ const Track = () => {
         )}
 
         {activeTab === 'food' && (
-          <form onSubmit={(e) => { e.preventDefault(); setFoodLog({ meal: '', notes: '' }); showSuccess(); }} className="space-y-4">
+          <form onSubmit={submitFoodLog} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Meal</label>
               <input type="text" value={foodLog.meal} onChange={(e) => setFoodLog({ ...foodLog, meal: e.target.value })} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 outline-none text-sm" placeholder="e.g. Grilled fish + vegetables" />
@@ -233,6 +257,13 @@ const Track = () => {
             <button type="submit" className="w-full bg-nephro-dark text-white font-bold py-3 rounded-xl flex items-center justify-center shadow-lg">
               <PlusCircle size={18} className="mr-2" /> Log Meal
             </button>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-gray-700 mb-2">Recent Meals</p>
+              {foodLogs.slice(0, 3).map((entry) => (
+                <p key={entry.id} className="text-xs text-gray-600">{entry.meal}{entry.notes ? ` — ${entry.notes}` : ''}</p>
+              ))}
+              {foodLogs.length === 0 && <p className="text-xs text-gray-500">No meals logged yet.</p>}
+            </div>
           </form>
         )}
 

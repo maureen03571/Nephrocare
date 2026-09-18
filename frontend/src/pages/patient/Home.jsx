@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle, Flame } from 'lucide-react';
+import { Droplet, Activity, Calendar, Clock, Bell, Sparkles, Trophy, ShieldCheck, AlertCircle, Flame, Scale } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
-const getDayOfYear = () => {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now - start) / 86400000);
-};
+const ALL_PRIORITY_ACTIONS = [
+  { id: 'hydration', title: 'Drink Water (1L target)', note: 'Hydration target', icon: <Droplet size={18} /> },
+  { id: 'medication', title: 'Lisinopril 10mg', note: 'Morning kidney regimen', icon: <Bell size={18} /> },
+  { id: 'weight', title: 'Log morning weight', note: 'Daily weight tracking', icon: <Scale size={18} /> },
+  { id: 'dialysis', title: 'Dialysis Session', note: 'Prepare for today\'s session', icon: <Clock size={18} /> }
+];
 
 const Home = () => {
   const { user } = useAuth();
@@ -23,22 +24,6 @@ const Home = () => {
   const [completingActionId, setCompletingActionId] = useState(null);
   const [showMedicationDetail, setShowMedicationDetail] = useState(false);
   const [localCompletedActions, setLocalCompletedActions] = useState({});
-
-  useEffect(() => {
-    if ('Notification' in window) {
-      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-        Notification.requestPermission();
-      }
-      const timer = setTimeout(() => {
-        if (Notification.permission === 'granted') {
-          new Notification('NephroCare Reminder', { body: 'Time for your 1L water intake and Lisinopril!' });
-        } else {
-          alert('NephroCare Reminder: Time for your 1L water intake and Lisinopril!');
-        }
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -84,16 +69,10 @@ const Home = () => {
     { label: 'BP stable', done: symptoms.filter(s => s.severity === 'High').length === 0 }
   ];
 
-  const basePriorityActions = [
-    { id: 'hydration', title: 'Drink Water (1L target)', note: 'Hydration target', icon: <Droplet size={18} />, theme: 'blue' },
-    { id: 'medication', title: 'Lisinopril 10mg', note: 'Morning kidney regimen', icon: <Bell size={18} /> },
-    { id: 'dialysis', title: 'Dialysis Session', note: 'Prepare in 3 hours', icon: <Clock size={18} /> }
-  ];
-  const rotationOffset = getDayOfYear() % basePriorityActions.length;
-  const priorityActions = [
-    ...basePriorityActions.slice(rotationOffset),
-    ...basePriorityActions.slice(0, rotationOffset)
-  ];
+  const onDialysis = /dialysis/i.test(profile?.treatments || '');
+  const priorityActions = ALL_PRIORITY_ACTIONS.filter(
+    (action) => action.id !== 'dialysis' || onDialysis
+  );
 
   const healthScoreValue = dashboard?.healthScore?.value ?? null;
   const streakDays = dashboard?.streaks?.medicationDays ?? 0;
@@ -102,7 +81,7 @@ const Home = () => {
   const completedActions = dailyProgress?.completed || {};
   const effectiveCompletedActions = { ...localCompletedActions, ...completedActions };
   const fluidTodayMl = Number(quickStatsFromApi.fluidTodayMl || 0);
-  const totalDailyTasks = dailyProgress?.progress?.totalActions ?? priorityActions.length;
+  const totalDailyTasks = dailyProgress?.progress?.totalActions ?? (onDialysis ? 4 : 3);
   const completedDailyTasks = dailyProgress?.progress?.completedCount ?? 0;
   const fallbackCompletedDailyTasks = Object.values(effectiveCompletedActions).filter(Boolean).length;
   const visibleCompletedDailyTasks = dailyProgress ? completedDailyTasks : fallbackCompletedDailyTasks;
@@ -127,15 +106,18 @@ const Home = () => {
   };
 
   const completePriorityAction = async (actionId) => {
+    const isCurrentlyCompleted = Boolean(effectiveCompletedActions[actionId]);
+    const nextCompleted = !isCurrentlyCompleted;
     try {
       setCompletingActionId(actionId);
       const res = await axios.post(`${API_BASE_URL}/api/patient/${user.id}/daily-actions/complete`, {
-        actionType: actionId
+        actionType: actionId,
+        completed: nextCompleted
       });
       setDailyProgress(res.data);
     } catch (error) {
       console.error('Failed to complete daily action', error);
-      setLocalCompletedActions((prev) => ({ ...prev, [actionId]: true }));
+      setLocalCompletedActions((prev) => ({ ...prev, [actionId]: nextCompleted }));
     } finally {
       setCompletingActionId(null);
     }
@@ -168,16 +150,18 @@ const Home = () => {
           <h3 className="font-bold text-base text-nephro-dark">Today's Checklist</h3>
           <p className="text-xs text-gray-500">{visibleCompletedDailyTasks}/{totalDailyTasks} done</p>
         </div>
+        <p className="text-[11px] text-gray-500 mt-1">Tap the checkbox on the right to tick or untick.</p>
         <div className="space-y-2 mt-3">
           {priorityActions.map((action) => (
-            <div key={action.id} className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 flex items-center justify-between">
-              <div
-                className="flex items-center gap-2"
-              >
-                <div className="w-8 h-8 rounded-lg bg-nephro-bg text-nephro-primary flex items-center justify-center">
+            <div
+              key={action.id}
+              className="w-full bg-white border border-gray-100 rounded-xl px-3 py-2 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-nephro-bg text-nephro-primary flex items-center justify-center shrink-0">
                   {action.icon}
                 </div>
-                <div className="text-left">
+                <div className="text-left min-w-0">
                   <p className="text-sm font-semibold text-nephro-dark">{action.title}</p>
                   <p className="text-[11px] text-gray-500">{action.note}</p>
                   {action.id === 'medication' && (
@@ -194,8 +178,9 @@ const Home = () => {
               <button
                 type="button"
                 onClick={() => completePriorityAction(action.id)}
-                disabled={Boolean(effectiveCompletedActions[action.id]) || completingActionId === action.id}
-                className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-xs font-bold disabled:opacity-60 ${effectiveCompletedActions[action.id] ? 'bg-nephro-primary border-nephro-primary text-white' : 'border-gray-300 text-transparent'}`}
+                disabled={completingActionId === action.id}
+                aria-label={`Mark ${action.title} as ${effectiveCompletedActions[action.id] ? 'incomplete' : 'complete'}`}
+                className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-xs font-bold disabled:opacity-60 shrink-0 ml-2 ${effectiveCompletedActions[action.id] ? 'bg-nephro-primary border-nephro-primary text-white' : 'border-gray-300 text-transparent'}`}
               >
                 ✓
               </button>

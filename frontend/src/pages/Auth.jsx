@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
+import { getPatientHomePath } from '../utils/patientSetup';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,7 +17,47 @@ const Auth = () => {
   const [error, setError] = useState('');
   
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === 'patient') {
+      getPatientHomePath(user.id, API_BASE_URL).then(navigate);
+    } else if (user.role === 'doctor') {
+      navigate('/doctor');
+    } else if (user.role === 'caregiver') {
+      navigate('/caregiver');
+    }
+  }, [user, navigate]);
+
+  const routeAfterAuth = async (authUser, isNewUser = false) => {
+    login(authUser);
+    if (authUser.role === 'patient') {
+      const destination = isNewUser
+        ? '/patient/setup'
+        : await getPatientHomePath(authUser.id, API_BASE_URL);
+      navigate(destination);
+    } else if (authUser.role === 'doctor') {
+      navigate('/doctor');
+    } else if (authUser.role === 'caregiver') {
+      navigate('/caregiver');
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError('');
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/auth/google`, {
+        credential: credentialResponse.credential,
+        role: isLogin ? undefined : role
+      });
+      if (res.data.success) {
+        await routeAfterAuth(res.data.user, res.data.isNewUser);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google Sign-In failed');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,14 +69,7 @@ const Auth = () => {
     try {
       const res = await axios.post(`${API_BASE_URL}/api/auth/${isLogin ? 'login' : 'register'}`, payload);
       if (res.data.success) {
-        login(res.data.user);
-        if (res.data.user.role === 'patient') {
-          navigate(isLogin ? '/patient/home' : '/patient/setup');
-        } else if (res.data.user.role === 'doctor') {
-          navigate('/doctor');
-        } else if (res.data.user.role === 'caregiver') {
-          navigate('/caregiver');
-        }
+        await routeAfterAuth(res.data.user, !isLogin);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Authentication failed');
@@ -117,11 +154,36 @@ const Auth = () => {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-nephro-primary to-nephro-light text-white font-black py-4 px-4 rounded-2xl mt-8 shadow-[0_0_20px_rgba(26,107,74,0.4)] hover:shadow-[0_0_30px_rgba(26,107,74,0.6)] transition-all duration-300 active:scale-95 border border-white/20 tracking-wide text-lg"
+              className="w-full bg-gradient-to-r from-nephro-primary to-nephro-light text-white font-black py-4 px-4 rounded-2xl mt-4 shadow-[0_0_20px_rgba(26,107,74,0.4)] hover:shadow-[0_0_30px_rgba(26,107,74,0.6)] transition-all duration-300 active:scale-95 border border-white/20 tracking-wide text-lg"
             >
               {isLogin ? 'LOG IN' : 'SIGN UP'}
             </button>
           </form>
+
+          {GOOGLE_CLIENT_ID ? (
+            <>
+              <div className="flex items-center gap-3 my-5">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">or</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Google Sign-In was cancelled or failed')}
+                  theme="outline"
+                  size="large"
+                  text={isLogin ? 'continue_with' : 'signup_with'}
+                  shape="pill"
+                  width="280"
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-center text-gray-500 mt-4">
+              Google Sign-In: set <span className="font-semibold">VITE_GOOGLE_CLIENT_ID</span> in frontend env.
+            </p>
+          )}
         </div>
 
         <div className="mt-8 text-center bg-white/30 backdrop-blur-sm p-5 rounded-3xl mx-4 border border-white/50 shadow-[0_4px_15px_rgba(0,0,0,0.02)]">

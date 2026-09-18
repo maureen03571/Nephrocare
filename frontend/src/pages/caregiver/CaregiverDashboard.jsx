@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { LogOut, Heart, Bell, Calendar, User, Bot, ClipboardList } from 'lucide-react';
+import { LogOut, Heart, Bell, User, Bot, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AIChat from '../../components/AIChat';
 import { API_BASE_URL } from '../../config';
@@ -13,17 +14,14 @@ const CaregiverDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    // For now, caregiver sees the first registered patient as their "assigned" one
-    // In a real app, this would be a specific assignment join table
-    axios.get(`${API_BASE_URL}/api/users/patients`)
-      .then(res => {
-        if (res.data.patients && res.data.patients.length > 0) {
-          setPatient(res.data.patients[0]);
-        }
+    if (!user?.id) return;
+    axios.get(`${API_BASE_URL}/api/caregiver/${user.id}/patient`)
+      .then((res) => {
+        setPatient(res.data.patient || null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [user?.id]);
 
   const handleLogout = () => {
     logout();
@@ -70,7 +68,8 @@ const CaregiverDashboard = () => {
                 <div className="w-8 h-8 border-4 border-nephro-primary border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : patient ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6 relative">
+              <>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4 relative">
                 <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-nephro-primary to-nephro-accentLight"></div>
                 <div className="p-5 pt-6 flex items-center">
                   <div className="w-14 h-14 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary shadow-inner mr-4">
@@ -78,10 +77,23 @@ const CaregiverDashboard = () => {
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-nephro-dark">{patient.name}</h4>
-                    <p className="text-sm text-nephro-primary font-medium">{patient.profile?.condition || 'No Condition Set'}</p>
+                    <p className="text-sm text-nephro-primary font-medium">{patient.profile?.condition || 'No Condition Set'} • {patient.profile?.stage || 'Stage not set'}</p>
                   </div>
                 </div>
               </div>
+              {patient.dashboard && (
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <p className="text-[11px] uppercase text-gray-500 font-semibold">Health Score</p>
+                    <p className="text-xl font-extrabold text-nephro-dark mt-1">{patient.dashboard.healthScore?.value ?? '--'}</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <p className="text-[11px] uppercase text-gray-500 font-semibold">Med Streak</p>
+                    <p className="text-xl font-extrabold text-nephro-dark mt-1">{patient.dashboard.streaks?.medicationDays ?? 0} days</p>
+                  </div>
+                </div>
+              )}
+              </>
             ) : (
               <div className="bg-white rounded-2xl p-6 border border-gray-100 text-center mb-6">
                 <User size={32} className="mx-auto text-gray-300 mb-2" />
