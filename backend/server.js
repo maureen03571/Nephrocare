@@ -5,6 +5,12 @@ require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const { loadDataStore, saveDataStore } = require('./lib/dataStore');
 const {
+  hashPassword,
+  verifyPassword,
+  isBcryptHash,
+  toPublicUser
+} = require('./lib/auth');
+const {
   validateAuthRegister,
   validateSymptomPayload,
   validateMedicationPayload,
@@ -15,7 +21,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ─── Async dataStore cache ────────────────────────────────────────────────────
+// ??? Async dataStore cache ????????????????????????????????????????????????????
 // On Vercel each serverless invocation may be a cold start, so we keep a
 // module-level cache that is populated on first request and reused within the
 // same invocation. The cache is invalidated (nulled) after every save so the
@@ -35,7 +41,7 @@ const saveData = async (data) => {
   _cache = data; // keep cache in sync
 };
 
-// ─── Pure helper functions (synchronous, operate on a passed-in store) ────────
+// ??? Pure helper functions (synchronous, operate on a passed-in store) ????????
 
 const toNumber = (value) => {
   const n = Number(value);
@@ -157,6 +163,17 @@ const priorityActionCatalog = {
   dialysis:   { title: 'Dialysis session prep',      metricLabel: 'Dialysis prep started' }
 };
 
+const patientOnDialysis = (ds, patientId) => {
+  const profile = ds.profiles[patientId] || {};
+  return /dialysis/i.test(profile.treatments || '');
+};
+
+const getPriorityActionTypes = (ds, patientId) => {
+  const types = ['hydration', 'medication', 'weight'];
+  if (patientOnDialysis(ds, patientId)) types.push('dialysis');
+  return types;
+};
+
 const getDailyActionBucket = (ds, patientId, dayKey = getTodayKey()) => {
   if (!ds.dailyActions[patientId]) ds.dailyActions[patientId] = {};
   if (!ds.dailyActions[patientId][dayKey]) {
@@ -169,7 +186,7 @@ const getDailyActionBucket = (ds, patientId, dayKey = getTodayKey()) => {
   return ds.dailyActions[patientId][dayKey];
 };
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// ??? Routes ???????????????????????????????????????????????????????????????????
 
 // Users
 app.get('/api/users/doctors', async (req, res) => {
@@ -204,13 +221,29 @@ app.get('/api/users/patients', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const ds   = await getDataStore();
-    const user = ds.users.find(u => u.email === email && u.password === password);
-    if (user) {
-      res.json({ success: true, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
-    } else {
-      res.status(401).json({ success: false, message: 'Invalid credentials' });
+    const ds = await getDataStore();
+    const user = ds.users.find((u) => u.email === email);
+
+    if (!user || !user.password) {
+      return res.status(401).json({
+        success: false,
+        message: user?.isGoogle
+          ? 'This account uses Google Sign-In. Continue with Google instead.'
+          : 'Invalid credentials'
+      });
     }
+
+    const valid = await verifyPassword(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (!isBcryptHash(user.password)) {
+      user.password = await hashPassword(password);
+      await saveData(ds);
+    }
+
+    res.json({ success: true, user: toPublicUser(user) });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -223,13 +256,21 @@ app.post('/api/auth/register', async (req, res) => {
     if (validationError) return res.status(400).json({ success: false, message: validationError });
 
     const ds = await getDataStore();
-    if (ds.users.find(u => u.email === email)) {
+    if (ds.users.find((u) => u.email === email)) {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
-    const newUser = { id: uuidv4(), email, password, name, role };
+
+    const newUser = {
+      id: uuidv4(),
+      email,
+      password: await hashPassword(password),
+      name,
+      role,
+      authProvider: 'local'
+    };
     ds.users.push(newUser);
     await saveData(ds);
-    res.json({ success: true, user: { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name } });
+    res.json({ success: true, user: toPublicUser(newUser) });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -241,9 +282,14 @@ app.post('/api/auth/verify', async (req, res) => {
     if (!userId || !password) {
       return res.status(400).json({ success: false, message: 'userId and password are required' });
     }
-    const ds   = await getDataStore();
-    const user = ds.users.find(u => u.id === userId && u.password === password);
-    if (user) {
+    const ds = await getDataStore();
+    const user = ds.users.find((u) => u.id === userId);
+    if (!user?.password) {
+      return res.status(401).json({ success: false, message: 'Incorrect password' });
+    }
+
+    const valid = await verifyPassword(password, user.password);
+    if (valid) {
       res.json({ success: true, message: 'Password verified' });
     } else {
       res.status(401).json({ success: false, message: 'Incorrect password' });
@@ -253,7 +299,7 @@ app.post('/api/auth/verify', async (req, res) => {
   }
 });
 
-// Google Sign-In sync — registers or updates a Google user in Firestore
+// Google Sign-In sync ? registers or updates a Google user in Firestore
 app.post('/api/auth/google-sync', async (req, res) => {
   try {
     const { uid, email, name, role } = req.body;
@@ -384,9 +430,10 @@ app.get('/api/patient/:id/daily-actions', async (req, res) => {
     const ds     = await getDataStore();
     const dayKey = req.query.date || getTodayKey();
     const bucket = getDailyActionBucket(ds, req.params.id, dayKey);
-    const totalActions    = Object.keys(priorityActionCatalog).length;
-    const completedCount  = Object.values(bucket.completed).filter(Boolean).length;
-    const progressPercent = Math.round((completedCount / totalActions) * 100);
+    const actionTypes = getPriorityActionTypes(ds, req.params.id);
+    const totalActions = actionTypes.length;
+    const completedCount = actionTypes.filter((type) => bucket.completed[type]).length;
+    const progressPercent = totalActions ? Math.round((completedCount / totalActions) * 100) : 0;
     res.json({
       success: true,
       date:    dayKey,
@@ -402,6 +449,7 @@ app.get('/api/patient/:id/daily-actions', async (req, res) => {
 app.post('/api/patient/:id/daily-actions/complete', async (req, res) => {
   try {
     const actionType  = String(req.body?.actionType || '').trim();
+    const completed = req.body?.completed === false ? false : true;
     const dayKey      = req.body?.date || getTodayKey();
     const catalogItem = priorityActionCatalog[actionType];
 
@@ -410,9 +458,13 @@ app.post('/api/patient/:id/daily-actions/complete', async (req, res) => {
     }
 
     const ds     = await getDataStore();
+    if (!getPriorityActionTypes(ds, req.params.id).includes(actionType)) {
+      return res.status(400).json({ success: false, message: 'This action is not in your daily checklist' });
+    }
+
     const bucket = getDailyActionBucket(ds, req.params.id, dayKey);
 
-    if (!bucket.completed[actionType]) {
+    if (completed && !bucket.completed[actionType]) {
       bucket.history.push({
         id:          uuidv4(),
         actionType,
@@ -421,13 +473,14 @@ app.post('/api/patient/:id/daily-actions/complete', async (req, res) => {
         completedAt: new Date().toISOString()
       });
     }
-    bucket.completed[actionType] = true;
+    bucket.completed[actionType] = completed;
     bucket.updatedAt = new Date().toISOString();
     await saveData(ds);
 
-    const totalActions    = Object.keys(priorityActionCatalog).length;
-    const completedCount  = Object.values(bucket.completed).filter(Boolean).length;
-    const progressPercent = Math.round((completedCount / totalActions) * 100);
+    const actionTypes = getPriorityActionTypes(ds, req.params.id);
+    const totalActions = actionTypes.length;
+    const completedCount = actionTypes.filter((type) => bucket.completed[type]).length;
+    const progressPercent = totalActions ? Math.round((completedCount / totalActions) * 100) : 0;
     res.json({
       success: true,
       date:    dayKey,
@@ -729,6 +782,69 @@ app.post('/api/patient/:id/appointments', async (req, res) => {
   }
 });
 
+app.get('/api/patient/:id/food-logs', async (req, res) => {
+  try {
+    const ds = await getDataStore();
+    const foodLogs = (ds.foodLogs[req.params.id] || []).slice().reverse();
+    res.json({ success: true, foodLogs });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+app.post('/api/patient/:id/food-logs', async (req, res) => {
+  try {
+    const meal = String(req.body?.meal || '').trim();
+    if (!meal) {
+      return res.status(400).json({ success: false, message: 'meal is required' });
+    }
+    const ds = await getDataStore();
+    if (!ds.foodLogs[req.params.id]) ds.foodLogs[req.params.id] = [];
+    const entry = {
+      id: uuidv4(),
+      meal,
+      notes: String(req.body?.notes || '').trim(),
+      date: new Date().toISOString()
+    };
+    ds.foodLogs[req.params.id].push(entry);
+    await saveData(ds);
+    res.json({ success: true, foodLog: entry });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+app.get('/api/patient/:id/check-in', async (req, res) => {
+  try {
+    const ds = await getDataStore();
+    const dayKey = req.query.date || getTodayKey();
+    const checkIn = ds.dailyCheckIns[req.params.id]?.[dayKey] || null;
+    res.json({ success: true, date: dayKey, checkIn });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+app.post('/api/patient/:id/check-in', async (req, res) => {
+  try {
+    const mood = String(req.body?.mood || '').trim();
+    if (!mood) {
+      return res.status(400).json({ success: false, message: 'mood is required' });
+    }
+    const ds = await getDataStore();
+    const dayKey = req.body?.date || getTodayKey();
+    if (!ds.dailyCheckIns[req.params.id]) ds.dailyCheckIns[req.params.id] = {};
+    ds.dailyCheckIns[req.params.id][dayKey] = {
+      mood,
+      updatedAt: new Date().toISOString()
+    };
+    await saveData(ds);
+    res.json({ success: true, date: dayKey, checkIn: ds.dailyCheckIns[req.params.id][dayKey] });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // Doctor Notes
 app.get('/api/patient/:id/notes', async (req, res) => {
   try {
@@ -816,7 +932,7 @@ const ARTICLES_BY_CATEGORY = {
     { id: 'a9',  title: 'Managing Anaemia in CKD',        readTime: '3 min', summary: 'Sign of damaged kidneys producing less erythropoietin.',                           content: 'Treatment includes EPO injections and iron supplements...' },
     { id: 'a13', title: 'Reading Your Lab Report',        readTime: '5 min', summary: 'Creatinine, BUN, GFR markers explained.',                                          content: 'Trends over time matter more than a single reading...' },
     { id: 'a14', title: 'Diabetes and CKD',               readTime: '4 min', summary: 'Diabetes is the leading cause of CKD.',                                            content: 'Tight glucose control is the most powerful kidney protector...' },
-    { id: 'a18', title: 'Dialysis: What to Expect',       readTime: '5 min', summary: 'Replaces kidney functions by filtering waste.',                                    content: 'Dialysis is not failure — it is life-saving...' },
+    { id: 'a18', title: 'Dialysis: What to Expect',       readTime: '5 min', summary: 'Replaces kidney functions by filtering waste.',                                    content: 'Dialysis is not failure ? it is life-saving...' },
     { id: 'a19', title: 'Kidney Transplant Basics',       readTime: '4 min', summary: 'Best long-term treatment for kidney failure.',                                      content: 'Evaluation should begin before you need dialysis...' }
   ],
   nutrition: [
@@ -949,7 +1065,7 @@ INSTRUCTIONS:
   }
 });
 
-// ─── Start server (local dev only) ───────────────────────────────────────────
+// ??? Start server (local dev only) ???????????????????????????????????????????
 const PORT = process.env.PORT || 3001;
 
 if (process.env.VERCEL !== '1') {

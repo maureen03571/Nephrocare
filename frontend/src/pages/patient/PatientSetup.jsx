@@ -18,10 +18,11 @@ const PatientSetup = () => {
     medicationList: ''
   });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    const fetchExistingData = async () => {
+    const loadExistingProfile = async () => {
       if (!user?.id) return;
       try {
         const [profileRes, onboardingRes] = await Promise.all([
@@ -38,17 +39,20 @@ const PatientSetup = () => {
           stage: profile.stage || onboarding.ckdStage || 'Stage 1',
           diagnosisDate: profile.diagnosisDate || '',
           treatments: profile.treatments || '',
-          baselineGfr: onboarding.baselineLabs?.gfr || '',
-          baselineCreatinine: onboarding.baselineLabs?.creatinine || '',
+          baselineGfr: onboarding.baselineLabs?.gfr ?? '',
+          baselineCreatinine: onboarding.baselineLabs?.creatinine ?? '',
           medicationList: Array.isArray(onboarding.medicationList)
             ? onboarding.medicationList.join(', ')
             : ''
         });
-      } catch (err) {
-        console.error('Failed to fetch existing profile data', err);
+      } catch (error) {
+        console.error('Failed to load profile for setup', error);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchExistingData();
+
+    loadExistingProfile();
   }, [user?.id, user?.name]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -58,7 +62,6 @@ const PatientSetup = () => {
     setErrorMessage('');
     setSaving(true);
     try {
-      // Save Profile
       await axios.put(`${API_BASE_URL}/api/patient/${user.id}/profile`, {
         name: formData.name,
         condition: formData.condition,
@@ -106,6 +109,11 @@ const PatientSetup = () => {
         <p className="text-sm text-gray-500 mt-1">Let's personalize your RenAmi experience.</p>
       </div>
 
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-nephro-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">
         {errorMessage && (
           <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-lg px-4 py-3">
@@ -116,7 +124,7 @@ const PatientSetup = () => {
           <label className="block text-sm font-medium text-nephro-dark mb-1">Full Name</label>
           <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none" />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-nephro-dark mb-1">Kidney Condition</label>
           <input type="text" name="condition" required value={formData.condition} onChange={handleChange} placeholder="e.g. Chronic Kidney Disease" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none" />
@@ -187,6 +195,7 @@ const PatientSetup = () => {
           {saving ? 'Saving...' : 'Complete Profile'}
         </button>
       </form>
+      )}
     </div>
   );
 };

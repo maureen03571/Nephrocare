@@ -61,6 +61,13 @@ const Profile = () => {
   const [dashboard, setDashboard] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [linkCode, setLinkCode] = useState('');
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [appointmentForm, setAppointmentForm] = useState({
+    title: 'Nephrology follow-up',
+    date: '',
+    doctorName: 'Dr. Sarah Kimani'
+  });
+  const [savingAppointment, setSavingAppointment] = useState(false);
 
   /* Modal state */
   const [modal, setModal] = useState(null); // 'notifications' | 'privacy' | 'settings'
@@ -87,32 +94,50 @@ const Profile = () => {
     localStorage.setItem('nephro_notif', JSON.stringify(next));
   };
 
+  const loadProfileData = async () => {
+    if (!user?.id) return;
+    try {
+      const [profileRes, onboardingRes, dashboardRes, appointmentsRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`),
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`),
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
+      ]);
+      setProfile(profileRes.data.profile || null);
+      setOnboarding(onboardingRes.data.onboarding || null);
+      setDashboard(dashboardRes.data.dashboard || null);
+      setAppointments(appointmentsRes.data.appointments || []);
+
+      const codeRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/link-code`);
+      setLinkCode(codeRes.data.linkCode);
+    } catch (error) {
+      console.error('Failed to load profile summary', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!user?.id) return;
-      try {
-        const [profileRes, onboardingRes, dashboardRes, appointmentsRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
-          axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`),
-          axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`),
-          axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
-        ]);
-        setProfile(profileRes.data.profile || null);
-        setOnboarding(onboardingRes.data.onboarding || null);
-        setDashboard(dashboardRes.data.dashboard || null);
-        setAppointments(appointmentsRes.data.appointments || []);
-        
-        // Fetch link code
-        const codeRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/link-code`);
-        setLinkCode(codeRes.data.linkCode);
-      } catch (error) {
-        console.error('Failed to load profile summary', error);
-      }
-    };
-    fetchProfileData();
+    loadProfileData();
   }, [user?.id]);
 
-  const handleLogout = () => { logout(); navigate('/'); };
+  const scheduleAppointment = async (e) => {
+    e.preventDefault();
+    setSavingAppointment(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/patient/${user.id}/appointments`, appointmentForm);
+      setShowAppointmentForm(false);
+      setAppointmentForm({ title: 'Nephrology follow-up', date: '', doctorName: 'Dr. Sarah Kimani' });
+      await loadProfileData();
+    } catch (error) {
+      console.error('Failed to schedule appointment', error);
+    } finally {
+      setSavingAppointment(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   const streakDays = dashboard?.streaks?.medicationDays ?? 0;
 
@@ -174,12 +199,12 @@ const Profile = () => {
         </div>
         <h4 className="text-sm font-bold text-nephro-dark mb-1">Share Access with Caregiver</h4>
         <p className="text-xs text-gray-500 mb-4">Give this code to your caregiver to link your health updates.</p>
-        
+
         <div className="flex items-center space-x-3">
           <div className="flex-1 bg-nephro-bg border-2 border-dashed border-nephro-primary/30 rounded-xl p-3 flex items-center justify-center">
             <span className="text-2xl font-mono font-black tracking-widest text-nephro-primary">{linkCode || '------'}</span>
           </div>
-          <button 
+          <button
             onClick={() => {
               navigator.clipboard.writeText(linkCode);
               alert('Link code copied to clipboard!');
@@ -194,18 +219,54 @@ const Profile = () => {
 
       {/* Care Team */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
-        <h4 className="text-sm font-bold text-nephro-dark mb-2">Care Team &amp; Next Visit</h4>
-        <p className="text-xs text-gray-600">Primary doctor: <span className="font-semibold">Dr. Assigned via Care Team</span></p>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-bold text-nephro-dark">Care Team &amp; Next Visit</h4>
+          <button
+            type="button"
+            onClick={() => setShowAppointmentForm((prev) => !prev)}
+            className="text-xs font-bold text-nephro-primary"
+          >
+            {showAppointmentForm ? 'Cancel' : 'Schedule'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-600">Primary doctor: <span className="font-semibold">Dr. Sarah Kimani</span></p>
         <p className="text-xs text-gray-600 mt-1">
           Next appointment: <span className="font-semibold">
             {appointments[0]?.date ? new Date(appointments[0].date).toLocaleString() : 'No appointment scheduled'}
           </span>
         </p>
+        {showAppointmentForm && (
+          <form onSubmit={scheduleAppointment} className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+            <input
+              type="text"
+              required
+              value={appointmentForm.title}
+              onChange={(e) => setAppointmentForm({ ...appointmentForm, title: e.target.value })}
+              className="w-full p-3 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-nephro-primary"
+              placeholder="Appointment title"
+            />
+            <input
+              type="datetime-local"
+              required
+              value={appointmentForm.date}
+              onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
+              className="w-full p-3 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-nephro-primary"
+            />
+            <button
+              type="submit"
+              disabled={savingAppointment}
+              className="w-full bg-nephro-primary text-white font-bold py-3 rounded-xl disabled:opacity-60"
+            >
+              {savingAppointment ? 'Saving...' : 'Save Appointment'}
+            </button>
+          </form>
+        )}
       </div>
 
       {/* Settings Menu */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50 mb-6">
         <MenuRow icon={<FileText size={20} />} label="Health Profile Data" onClick={() => navigate('/patient/setup')} />
+        <MenuRow icon={<User size={20} />} label="Message Care Team" onClick={() => navigate('/patient/care-team')} />
         <MenuRow icon={<Bell size={20} />} label="Notifications" onClick={() => setModal('notifications')} />
         <MenuRow icon={<Shield size={20} />} label="Privacy &amp; Security" onClick={() => setModal('privacy')} />
         <MenuRow icon={<Settings size={20} />} label="App Settings" onClick={() => setModal('settings')} />
@@ -300,7 +361,7 @@ const Profile = () => {
               </button>
             </div>
           </div>
-          
+
           <ToggleRow
             label="Compact view"
             description="Reduce spacing for more content on screen"

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
+import { getPatientHomePath } from '../utils/patientSetup';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,43 +12,90 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  
+
   const navigate = useNavigate();
-  const { login, signInWithGoogle } = useAuth();
+  const { user, login, signInWithGoogle } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === 'patient') {
+      getPatientHomePath(user.id, API_BASE_URL).then(navigate);
+    } else if (user.role === 'doctor') {
+      navigate('/doctor');
+    } else if (user.role === 'caregiver') {
+      navigate('/caregiver');
+    }
+  }, [user, navigate]);
+
+  const routeAfterAuth = async (authUser, isNewUser = false) => {
+    login(authUser);
+    if (authUser.role === 'patient') {
+      const destination = isNewUser
+        ? '/patient/setup'
+        : await getPatientHomePath(authUser.id, API_BASE_URL);
+      navigate(destination);
+    } else if (authUser.role === 'doctor') {
+      navigate('/doctor');
+    } else if (authUser.role === 'caregiver') {
+      navigate('/caregiver');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const payload = isLogin 
+    const payload = isLogin
       ? { email, password, role }
       : { email, password, name, role };
 
     try {
       const res = await axios.post(`${API_BASE_URL}/api/auth/${isLogin ? 'login' : 'register'}`, payload);
       if (res.data.success) {
-        login(res.data.user);
-        if (res.data.user.role === 'patient') {
-          navigate(isLogin ? '/patient/home' : '/patient/setup');
-        } else if (res.data.user.role === 'doctor') {
-          navigate('/doctor');
-        } else if (res.data.user.role === 'caregiver') {
-          navigate('/caregiver');
-        }
+        await routeAfterAuth(res.data.user, !isLogin);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Authentication failed');
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    try {
+      const googleUser = await signInWithGoogle();
+      if (!googleUser) return;
+
+      const syncRes = await axios.post(`${API_BASE_URL}/api/auth/google-sync`, {
+        uid: googleUser.uid,
+        email: googleUser.email,
+        name: googleUser.displayName,
+        role
+      });
+
+      if (syncRes.data.success) {
+        const isNewUser = !googleUser.metadata?.lastSignInTime ||
+          googleUser.metadata.creationTime === googleUser.metadata.lastSignInTime;
+        await routeAfterAuth(syncRes.data.user, isNewUser);
+      }
+    } catch (err) {
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Google Sign-In is not enabled in Firebase Console. Please enable it in the Sign-in Method tab.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized for Google Sign-In. Add it in Firebase Console Settings.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in popup closed before completion.');
+      } else {
+        setError(err.response?.data?.message || `Google Sign-In failed (${err.code || err.message || 'Unknown Error'}).`);
+      }
+    }
+  };
+
   return (
     <div className="min-h-[800px] h-full flex flex-col p-6 bg-nephro-bg relative overflow-hidden">
-      {/* Animated Glowing Orbs */}
       <div className="absolute top-[-10%] left-[-20%] w-[500px] h-[500px] bg-nephro-accentLight/40 rounded-full blur-[100px] animate-pulse pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-20%] w-[500px] h-[500px] bg-nephro-primary/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[300px] h-[300px] bg-white/40 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="flex-1 flex flex-col justify-center relative z-10 w-full max-w-sm mx-auto">
-        {/* Header */}
         <div className="text-center mb-10">
           <h2 className="text-4xl font-black text-nephro-primary drop-shadow-sm tracking-tight">
             {isLogin ? 'Welcome Back' : 'Create Account'}
@@ -63,7 +111,6 @@ const Auth = () => {
           </div>
         )}
 
-        {/* Premium Glassmorphism Form Card */}
         <div className="backdrop-blur-xl bg-white/50 border border-white/60 p-6 rounded-[32px] shadow-[0_8px_32px_rgba(26,107,74,0.1)]">
           <div className="mb-6 flex p-1.5 bg-white/60 backdrop-blur-md rounded-[18px] shadow-inner border border-white/40">
             {['patient', 'doctor', 'caregiver'].map((r) => (
@@ -94,7 +141,7 @@ const Auth = () => {
                 />
               </div>
             )}
-            
+
             <div>
               <label className="block text-xs font-bold text-nephro-dark/80 mb-1.5 uppercase tracking-wider ml-1">Email Address</label>
               <input
@@ -104,7 +151,7 @@ const Auth = () => {
                 value={email} onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            
+
             <div>
               <label className="block text-xs font-bold text-nephro-dark/80 mb-1.5 uppercase tracking-wider ml-1">Password</label>
               <input
@@ -117,7 +164,7 @@ const Auth = () => {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-nephro-primary to-nephro-light text-white font-black py-4 px-4 rounded-2xl mt-8 shadow-[0_0_20px_rgba(26,107,74,0.4)] hover:shadow-[0_0_30px_rgba(26,107,74,0.6)] transition-all duration-300 active:scale-95 border border-white/20 tracking-wide text-lg"
+              className="w-full bg-gradient-to-r from-nephro-primary to-nephro-light text-white font-black py-4 px-4 rounded-2xl mt-4 shadow-[0_0_20px_rgba(26,107,74,0.4)] hover:shadow-[0_0_30px_rgba(26,107,74,0.6)] transition-all duration-300 active:scale-95 border border-white/20 tracking-wide text-lg"
             >
               {isLogin ? 'LOG IN' : 'SIGN UP'}
             </button>
@@ -125,57 +172,14 @@ const Auth = () => {
 
           <div className="mt-6">
             <div className="relative flex items-center justify-center mb-6">
-              <div className="flex-grow border-t border-gray-200"></div>
+              <div className="flex-grow border-t border-gray-200" />
               <span className="flex-shrink mx-4 text-xs font-bold text-gray-400">OR</span>
-              <div className="flex-grow border-t border-gray-200"></div>
+              <div className="flex-grow border-t border-gray-200" />
             </div>
 
             <button
               type="button"
-              onClick={async () => {
-                console.log('DEBUG: Google login button clicked');
-                try {
-                  const googleUser = await signInWithGoogle();
-                  if (googleUser) {
-                    const syncRes = await axios.post(`${API_BASE_URL}/api/auth/google-sync`, {
-                      uid: googleUser.uid,
-                      email: googleUser.email,
-                      name: googleUser.displayName,
-                      role: role
-                    });
-                    if (syncRes.data.success) {
-                      login(syncRes.data.user);
-                      if (syncRes.data.user.role === 'patient') {
-                        // Check if onboarding/profile is set up
-                        try {
-                          const profileRes = await axios.get(`${API_BASE_URL}/api/patient/${syncRes.data.user.id}/profile`);
-                          if (profileRes.data && profileRes.data.profile && profileRes.data.profile.age) {
-                            navigate('/patient/home');
-                          } else {
-                            navigate('/patient/setup');
-                          }
-                        } catch (err) {
-                          navigate('/patient/setup');
-                        }
-                      } else if (syncRes.data.user.role === 'doctor') {
-                        navigate('/doctor');
-                      } else if (syncRes.data.user.role === 'caregiver') {
-                        navigate('/caregiver');
-                      }
-                    }
-                  }
-                } catch (err) {
-                  if (err.code === 'auth/operation-not-allowed') {
-                    setError('Google Sign-In is not enabled in Firebase Console. Please enable it in the Sign-in Method tab.');
-                  } else if (err.code === 'auth/unauthorized-domain') {
-                    setError('This domain is not authorized for Google Sign-In. Add it in Firebase Console Settings.');
-                  } else if (err.code === 'auth/popup-closed-by-user') {
-                    setError('Sign-in popup closed before completion.');
-                  } else {
-                    setError(`Google Sign-In failed (${err.code || err.message || 'Unknown Error'}). Check console.`);
-                  }
-                }
-              }}
+              onClick={handleGoogleSignIn}
               className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 py-3.5 rounded-2xl font-bold text-gray-700 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm"
             >
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
@@ -199,4 +203,5 @@ const Auth = () => {
     </div>
   );
 };
+
 export default Auth;
