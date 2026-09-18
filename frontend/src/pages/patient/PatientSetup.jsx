@@ -29,19 +29,22 @@ const PatientSetup = () => {
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
           axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`)
         ]);
+
         const profile = profileRes.data.profile || {};
         const onboarding = onboardingRes.data.onboarding || {};
-        setFormData((prev) => ({
-          ...prev,
-          name: profile.name || prev.name,
+
+        setFormData({
+          name: profile.name || user?.name || '',
           condition: profile.condition || '',
           stage: profile.stage || onboarding.ckdStage || 'Stage 1',
           diagnosisDate: profile.diagnosisDate || '',
           treatments: profile.treatments || '',
           baselineGfr: onboarding.baselineLabs?.gfr ?? '',
           baselineCreatinine: onboarding.baselineLabs?.creatinine ?? '',
-          medicationList: Array.isArray(onboarding.medicationList) ? onboarding.medicationList.join(', ') : ''
-        }));
+          medicationList: Array.isArray(onboarding.medicationList)
+            ? onboarding.medicationList.join(', ')
+            : ''
+        });
       } catch (error) {
         console.error('Failed to load profile for setup', error);
       } finally {
@@ -50,7 +53,7 @@ const PatientSetup = () => {
     };
 
     loadExistingProfile();
-  }, [user?.id]);
+  }, [user?.id, user?.name]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -103,7 +106,7 @@ const PatientSetup = () => {
           ← Back to Home
         </button>
         <h2 className="text-2xl font-bold text-nephro-primary">Setup Your Profile</h2>
-        <p className="text-sm text-gray-500 mt-1">Let's personalize your NephroCare experience.</p>
+        <p className="text-sm text-gray-500 mt-1">Let's personalize your RenAmi experience.</p>
       </div>
 
       {loading ? (
@@ -121,7 +124,7 @@ const PatientSetup = () => {
           <label className="block text-sm font-medium text-nephro-dark mb-1">Full Name</label>
           <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none" />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-nephro-dark mb-1">Kidney Condition</label>
           <input type="text" name="condition" required value={formData.condition} onChange={handleChange} placeholder="e.g. Chronic Kidney Disease" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-nephro-primary outline-none" />

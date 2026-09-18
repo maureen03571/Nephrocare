@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { LogOut, Heart, Bell, User, Bot, ClipboardList } from 'lucide-react';
+import { LogOut, Heart, Bell, Calendar, User, Bot, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AIChat from '../../components/AIChat';
 import { API_BASE_URL } from '../../config';
@@ -12,16 +11,51 @@ const CaregiverDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [linkCode, setLinkCode] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
 
   React.useEffect(() => {
-    if (!user?.id) return;
-    axios.get(`${API_BASE_URL}/api/caregiver/${user.id}/patient`)
-      .then((res) => {
-        setPatient(res.data.patient || null);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    fetchLinkedPatient();
   }, [user?.id]);
+
+  const fetchLinkedPatient = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE_URL}/api/caregiver/${user.id}/patient`);
+      if (res.data.success) {
+        setPatient(res.data.patient);
+      }
+    } catch (err) {
+      console.error('No patient linked or failed to fetch', err);
+      setPatient(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLinkPatient = async (e) => {
+    e.preventDefault();
+    if (!linkCode.trim()) return;
+    
+    setIsLinking(true);
+    setLinkError('');
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/caregiver/link-patient`, {
+        caregiverId: user.id,
+        linkCode: linkCode.toUpperCase().trim()
+      });
+      
+      if (res.data.success) {
+        alert(`Successfully linked to ${res.data.patientName}!`);
+        fetchLinkedPatient();
+      }
+    } catch (err) {
+      setLinkError(err.response?.data?.message || 'Invalid link code. Please try again.');
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -68,36 +102,87 @@ const CaregiverDashboard = () => {
                 <div className="w-8 h-8 border-4 border-nephro-primary border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : patient ? (
-              <>
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4 relative">
-                <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-nephro-primary to-nephro-accentLight"></div>
-                <div className="p-5 pt-6 flex items-center">
-                  <div className="w-14 h-14 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary shadow-inner mr-4">
-                     <User size={24} />
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
+                  <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-nephro-primary to-nephro-accentLight"></div>
+                  <div className="p-5 pt-6 flex items-center">
+                    <div className="w-14 h-14 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary shadow-inner mr-4">
+                       <User size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-nephro-dark">{patient.name}</h4>
+                      <p className="text-sm text-nephro-primary font-medium">{patient.profile?.condition || 'No Condition Set'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-nephro-dark">{patient.name}</h4>
-                    <p className="text-sm text-nephro-primary font-medium">{patient.profile?.condition || 'No Condition Set'} • {patient.profile?.stage || 'Stage not set'}</p>
-                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CKD Stage</p>
+                      <p className="text-lg font-black text-nephro-dark">{patient.profile?.stage || 'N/A'}</p>
+                   </div>
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Health Score</p>
+                      <p className={`text-lg font-black ${patient.dashboard?.healthScore?.value >= 80 ? 'text-green-500' : 'text-orange-500'}`}>
+                         {patient.dashboard?.healthScore?.value || '--'}%
+                      </p>
+                   </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h4 className="font-bold text-sm text-nephro-dark mb-4 border-b border-gray-50 pb-2 flex items-center">
+                    <ClipboardList size={16} className="mr-2 text-nephro-primary" /> Medications
+                  </h4>
+                  {patient.meds?.length > 0 ? (
+                    <div className="space-y-3">
+                      {patient.meds.map((m, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                          <div>
+                            <p className="text-sm font-bold text-nephro-dark">{m.name}</p>
+                            <p className="text-[10px] text-gray-500">{m.dose} • {m.time}</p>
+                          </div>
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-xs text-gray-400 italic">No medications documented.</p>}
                 </div>
               </div>
-              {patient.dashboard && (
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <p className="text-[11px] uppercase text-gray-500 font-semibold">Health Score</p>
-                    <p className="text-xl font-extrabold text-nephro-dark mt-1">{patient.dashboard.healthScore?.value ?? '--'}</p>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <p className="text-[11px] uppercase text-gray-500 font-semibold">Med Streak</p>
-                    <p className="text-xl font-extrabold text-nephro-dark mt-1">{patient.dashboard.streaks?.medicationDays ?? 0} days</p>
-                  </div>
-                </div>
-              )}
-              </>
             ) : (
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 text-center mb-6">
-                <User size={32} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-sm text-gray-500 font-medium">No patients currently assigned <br/> to your care profile.</p>
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm mb-6">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-nephro-bg rounded-full flex items-center justify-center text-nephro-primary mb-4">
+                    <User size={32} />
+                  </div>
+                  <h4 className="text-lg font-bold text-nephro-dark mb-1">Link a Patient</h4>
+                  <p className="text-sm text-gray-500 mb-6 px-4">Enter the unique link code provided by your patient to securely connect to their care status.</p>
+                  
+                  <form onSubmit={handleLinkPatient} className="w-full max-w-xs">
+                    <div className="relative mb-3">
+                      <input 
+                        type="text" 
+                        maxLength={6}
+                        value={linkCode}
+                        onChange={(e) => setLinkCode(e.target.value.toUpperCase())}
+                        placeholder="ENTER CODE (e.g. AB12CD)"
+                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl py-3 px-4 text-center font-mono font-bold tracking-widest text-nephro-primary focus:border-nephro-primary focus:bg-white outline-none transition-all placeholder:font-sans placeholder:tracking-normal placeholder:text-gray-300"
+                        required
+                      />
+                    </div>
+                    {linkError && <p className="text-xs text-red-500 font-medium mb-3">⚠️ {linkError}</p>}
+                    <button 
+                      type="submit"
+                      disabled={isLinking || !linkCode}
+                      className="w-full bg-nephro-primary text-white font-bold py-3 rounded-xl shadow-md shadow-nephro-primary/10 hover:bg-nephro-dark active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-50"
+                    >
+                      {isLinking ? (
+                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        'Connect Account'
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
             )}
 

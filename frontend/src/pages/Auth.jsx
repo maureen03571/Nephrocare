@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { getPatientHomePath } from '../utils/patientSetup';
-
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,9 +12,9 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  
+
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { user, login, signInWithGoogle } = useAuth();
 
   useEffect(() => {
     if (!user) return;
@@ -44,25 +41,10 @@ const Auth = () => {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setError('');
-    try {
-      const res = await axios.post(`${API_BASE_URL}/api/auth/google`, {
-        credential: credentialResponse.credential,
-        role: isLogin ? undefined : role
-      });
-      if (res.data.success) {
-        await routeAfterAuth(res.data.user, res.data.isNewUser);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Google Sign-In failed');
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const payload = isLogin 
+    const payload = isLogin
       ? { email, password, role }
       : { email, password, name, role };
 
@@ -76,21 +58,50 @@ const Auth = () => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    try {
+      const googleUser = await signInWithGoogle();
+      if (!googleUser) return;
+
+      const syncRes = await axios.post(`${API_BASE_URL}/api/auth/google-sync`, {
+        uid: googleUser.uid,
+        email: googleUser.email,
+        name: googleUser.displayName,
+        role
+      });
+
+      if (syncRes.data.success) {
+        const isNewUser = !googleUser.metadata?.lastSignInTime ||
+          googleUser.metadata.creationTime === googleUser.metadata.lastSignInTime;
+        await routeAfterAuth(syncRes.data.user, isNewUser);
+      }
+    } catch (err) {
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Google Sign-In is not enabled in Firebase Console. Please enable it in the Sign-in Method tab.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized for Google Sign-In. Add it in Firebase Console Settings.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in popup closed before completion.');
+      } else {
+        setError(err.response?.data?.message || `Google Sign-In failed (${err.code || err.message || 'Unknown Error'}).`);
+      }
+    }
+  };
+
   return (
     <div className="min-h-[800px] h-full flex flex-col p-6 bg-nephro-bg relative overflow-hidden">
-      {/* Animated Glowing Orbs */}
       <div className="absolute top-[-10%] left-[-20%] w-[500px] h-[500px] bg-nephro-accentLight/40 rounded-full blur-[100px] animate-pulse pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-20%] w-[500px] h-[500px] bg-nephro-primary/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[300px] h-[300px] bg-white/40 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="flex-1 flex flex-col justify-center relative z-10 w-full max-w-sm mx-auto">
-        {/* Header */}
         <div className="text-center mb-10">
           <h2 className="text-4xl font-black text-nephro-primary drop-shadow-sm tracking-tight">
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
           <p className="text-nephro-dark/70 mt-2 font-medium text-lg">
-            {isLogin ? 'Log in to continue to NephroCare' : 'Join NephroCare today'}
+            {isLogin ? 'Log in to continue to RenAmi' : 'Join RenAmi today'}
           </p>
         </div>
 
@@ -100,7 +111,6 @@ const Auth = () => {
           </div>
         )}
 
-        {/* Premium Glassmorphism Form Card */}
         <div className="backdrop-blur-xl bg-white/50 border border-white/60 p-6 rounded-[32px] shadow-[0_8px_32px_rgba(26,107,74,0.1)]">
           <div className="mb-6 flex p-1.5 bg-white/60 backdrop-blur-md rounded-[18px] shadow-inner border border-white/40">
             {['patient', 'doctor', 'caregiver'].map((r) => (
@@ -131,7 +141,7 @@ const Auth = () => {
                 />
               </div>
             )}
-            
+
             <div>
               <label className="block text-xs font-bold text-nephro-dark/80 mb-1.5 uppercase tracking-wider ml-1">Email Address</label>
               <input
@@ -141,7 +151,7 @@ const Auth = () => {
                 value={email} onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            
+
             <div>
               <label className="block text-xs font-bold text-nephro-dark/80 mb-1.5 uppercase tracking-wider ml-1">Password</label>
               <input
@@ -160,30 +170,22 @@ const Auth = () => {
             </button>
           </form>
 
-          {GOOGLE_CLIENT_ID ? (
-            <>
-              <div className="flex items-center gap-3 my-5">
-                <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">or</span>
-                <div className="h-px flex-1 bg-gray-200" />
-              </div>
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Google Sign-In was cancelled or failed')}
-                  theme="outline"
-                  size="large"
-                  text={isLogin ? 'continue_with' : 'signup_with'}
-                  shape="pill"
-                  width="280"
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-center text-gray-500 mt-4">
-              Google Sign-In: set <span className="font-semibold">VITE_GOOGLE_CLIENT_ID</span> in frontend env.
-            </p>
-          )}
+          <div className="mt-6">
+            <div className="relative flex items-center justify-center mb-6">
+              <div className="flex-grow border-t border-gray-200" />
+              <span className="flex-shrink mx-4 text-xs font-bold text-gray-400">OR</span>
+              <div className="flex-grow border-t border-gray-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 py-3.5 rounded-2xl font-bold text-gray-700 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              Sign in with Google
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 text-center bg-white/30 backdrop-blur-sm p-5 rounded-3xl mx-4 border border-white/50 shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
@@ -201,4 +203,5 @@ const Auth = () => {
     </div>
   );
 };
+
 export default Auth;

@@ -3,5 +3,5 @@ const isLocal = window.location.hostname === 'localhost' || window.location.host
 
 // If running on Vercel (monorepo), the prefix is /_/backend
 // If using a separate service like Render, set VITE_API_URL in environment
-export const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? 'http://localhost:3001' : '/_/backend');
+export const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? 'http://localhost:3001' : '/api');
 

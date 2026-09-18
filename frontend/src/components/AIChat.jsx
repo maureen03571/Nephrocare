@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../config';
 const AIChat = ({ customTitle = "AI Health Coach", customSubtitle = "Conversational guide to kidney health" }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([
-    { id: 'init', role: 'ai', text: `Hello! I'm your NephroCare AI assistant. How can I help you today?` }
+    { id: 'init', role: 'ai', text: `Hello! I'm your RenAmi AI assistant. How can I help you today?` }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

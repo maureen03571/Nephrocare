@@ -60,6 +60,7 @@ const Profile = () => {
   const [onboarding, setOnboarding] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [linkCode, setLinkCode] = useState('');
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState({
     title: 'Nephrology follow-up',
@@ -67,24 +68,6 @@ const Profile = () => {
     doctorName: 'Dr. Sarah Kimani'
   });
   const [savingAppointment, setSavingAppointment] = useState(false);
-
-  const loadProfileData = async () => {
-    if (!user?.id) return;
-    try {
-      const [profileRes, onboardingRes, dashboardRes, appointmentsRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
-        axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`),
-        axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`),
-        axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
-      ]);
-      setProfile(profileRes.data.profile || null);
-      setOnboarding(onboardingRes.data.onboarding || null);
-      setDashboard(dashboardRes.data.dashboard || null);
-      setAppointments(appointmentsRes.data.appointments || []);
-    } catch (error) {
-      console.error('Failed to load profile summary', error);
-    }
-  };
 
   /* Modal state */
   const [modal, setModal] = useState(null); // 'notifications' | 'privacy' | 'settings'
@@ -109,6 +92,27 @@ const Profile = () => {
     const next = { ...notifPrefs, [key]: val };
     setNotifPrefs(next);
     localStorage.setItem('nephro_notif', JSON.stringify(next));
+  };
+
+  const loadProfileData = async () => {
+    if (!user?.id) return;
+    try {
+      const [profileRes, onboardingRes, dashboardRes, appointmentsRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/profile`),
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/onboarding`),
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/dashboard`),
+        axios.get(`${API_BASE_URL}/api/patient/${user.id}/appointments`)
+      ]);
+      setProfile(profileRes.data.profile || null);
+      setOnboarding(onboardingRes.data.onboarding || null);
+      setDashboard(dashboardRes.data.dashboard || null);
+      setAppointments(appointmentsRes.data.appointments || []);
+
+      const codeRes = await axios.get(`${API_BASE_URL}/api/patient/${user.id}/link-code`);
+      setLinkCode(codeRes.data.linkCode);
+    } catch (error) {
+      console.error('Failed to load profile summary', error);
+    }
   };
 
   useEffect(() => {
@@ -188,6 +192,32 @@ const Profile = () => {
         <p className="text-xs text-gray-600 mt-1">Symptoms tracked: <span className="font-semibold">{dashboard?.quickStats?.symptomsLogged ?? 0}</span></p>
       </div>
 
+      {/* 🔗 Caregiver Linking Section */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-nephro-primary/10 mb-4 relative overflow-hidden">
+        <div className="absolute right-0 top-0 p-3 opacity-10">
+          <Shield size={64} className="text-nephro-primary" />
+        </div>
+        <h4 className="text-sm font-bold text-nephro-dark mb-1">Share Access with Caregiver</h4>
+        <p className="text-xs text-gray-500 mb-4">Give this code to your caregiver to link your health updates.</p>
+
+        <div className="flex items-center space-x-3">
+          <div className="flex-1 bg-nephro-bg border-2 border-dashed border-nephro-primary/30 rounded-xl p-3 flex items-center justify-center">
+            <span className="text-2xl font-mono font-black tracking-widest text-nephro-primary">{linkCode || '------'}</span>
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(linkCode);
+              alert('Link code copied to clipboard!');
+            }}
+            className="bg-nephro-primary text-white p-3 rounded-xl shadow-md active:scale-95 transition-all"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-3 italic text-center">Codes are unique and secure. Share only with someone you trust.</p>
+      </div>
+
+      {/* Care Team */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-bold text-nephro-dark">Care Team &amp; Next Visit</h4>
@@ -249,7 +279,7 @@ const Profile = () => {
       >
         <LogOut size={20} className="mr-2" /> Log Out
       </button>
-      <p className="text-center text-xs text-gray-400 mt-8 mb-4">NephroCare v1.0.0</p>
+      <p className="text-center text-xs text-gray-400 mt-8 mb-4">RenAmi v1.0.0</p>
 
       {/* ── Notifications Modal ── */}
       {modal === 'notifications' && (
@@ -288,7 +318,7 @@ const Profile = () => {
           <div className="space-y-3 text-sm text-gray-700">
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="font-bold text-blue-800 mb-1">🔒 Your data is secure</p>
-              <p className="text-xs text-blue-700 leading-relaxed">All health data is stored on secure NephroCare infrastructure. Your information is never sold or shared with third parties without your explicit consent.</p>
+              <p className="text-xs text-blue-700 leading-relaxed">All health data is stored on secure RenAmi infrastructure. Your information is never sold or shared with third parties without your explicit consent.</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2">
               <p className="text-xs text-gray-600"><span className="font-semibold">Data storage:</span> Your records are stored in an encrypted backend database.</p>
@@ -331,7 +361,7 @@ const Profile = () => {
               </button>
             </div>
           </div>
-          
+
           <ToggleRow
             label="Compact view"
             description="Reduce spacing for more content on screen"
